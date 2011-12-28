@@ -36,6 +36,7 @@ class AsmInstruction:
                  opcodes, # for example, '\xFF\xD0'
                  mnemonic, # thus, CALL EAX
                  offset=0,
+                 donot_format_mnemonic=False,
                  processor='Intel', # reserved for future use
                  mode=32, # reserved for future use
                  ):
@@ -44,6 +45,7 @@ class AsmInstruction:
         self._offset = offset
         self._processor = processor
         self._mode = mode
+        self._donot_format_mnemonic = donot_format_mnemonic
         self._size = len(opcodes)
 
     def getOpcodes(self):
@@ -56,7 +58,10 @@ class AsmInstruction:
         return self._offset
 
     def display(self):
-        print '%s:%25s %s' %('%08X' %self._offset,' '.join(map(lambda byte: '%02X' %ord(byte), self._opcodes)),self._mnemonic) 
+        if not self._donot_format_mnemonic:
+            print '\t%s:%25s %s' %('%08X' %self._offset,' '.join(map(lambda byte: '%02X' %ord(byte), self._opcodes)),self._mnemonic) 
+        else:
+            print '\t%s:%25s %s' %('%08X' %self._offset,' ',self._mnemonic) 
 
     def getSize(self):
         return self._size
@@ -88,19 +93,64 @@ class Shellcode:
     def getEgg(self):
         return self._egg
 
+    def getPseudo(self):
+        return self._pseudo
+
     def getCurrentOffset(self):
         return self._current_offset
     
+    def getAsmInstructions(self):
+        return self._asm_instructions
+
     def display(self):
         for offset in self._offsets:
+            if offset in self._block_exit_tags:
+                print '\t|<- END OF BLOCK (%s)' %self._block_exit_tags[offset]
+            if offset in self._block_entry_tags:
+                print '\t->| START OF BLOCK (%s)' %self._block_entry_tags[offset]
             self._asm_instructions[offset].display()
+        for offset in self._block_exit_tags:
+            if not offset in self._offsets:
+                print '\t|<- END OF BLOCK (%s)' %self._block_exit_tags[offset]
+                break
+
+    def getOffsets(self):
+        return self._offsets
 
     def addAsmInstruction(self, asm):
         self._offsets.append(self._current_offset)
         self._asm_instructions[self._current_offset] = asm
         self._egg += asm.getOpcodes()
         self._current_offset += asm.getSize()
-        
+    
+    def addConstStr(self, const_str):
+        opcodes = const_str + '\x00'
+        mnemonic = 'DB %s,0' %const_str
+        asm = AsmInstruction(opcodes,
+                             mnemonic,
+                             self._current_offset,
+                             True,
+                             )
+        self.addAsmInstruction(asm)
+        return asm.getOffset()
+
+    def addShellcode(self, shellcode):
+        if shellcode.getPseudo():
+            self._block_entry_tags[self._current_offset] = shellcode.getPseudo()
+        self._egg += shellcode.getEgg()
+        self._offsets += shellcode.getOffsets()
+        for offset in shellcode.getOffsets():
+            self._asm_instructions[offset] = shellcode.getAsmInstructions()[offset]
+        self._current_offset += shellcode.getSize()
+        if shellcode.getPseudo():
+            self._block_exit_tags[self._current_offset] = shellcode.getPseudo()
+
+    def addBlockEntryTag(self, tag):
+        self._block_entry_tags[self._current_offset] = tag
+
+    def addBlockExitTag(self, tag):
+        self._block_exit_tags[self._current_offset] = tag
+
     def nop(self):
         opcodes = "\x90"
         mnemonic = 'NOP'
@@ -153,8 +203,7 @@ class Shellcode:
 
 
     def jmp(self, addr):
-        print addr - self._current_offset - CONDITIONALJMPSHELLCODE_LEN
-        opcodes = "\xE9" + struct.pack("<I", addr - self._current_offset - CONDITIONALJMPSHELLCODE_LEN)
+        opcodes = "\xE9" + struct.pack("<I", addr - self._current_offset - UNCONDITIONALJMPSHELLCODE_LEN)
         mnemonic = 'JMP 0x%0X' %addr
         asm = AsmInstruction(opcodes,
                              mnemonic,
@@ -214,7 +263,7 @@ class Shellcode:
 
     def pushDwPtrDs(self, ptr):
         opcodes = '\xFF\x35' + struct.pack('<I', ptr)
-        mnemonic = "MOV DWORD PTR DS:[0x%0X]" %ptr
+        mnemonic = "PUSH DWORD PTR DS:[0x%0X]" %ptr
         asm = AsmInstruction(opcodes,
                              mnemonic,
                              offset=self._current_offset,
