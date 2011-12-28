@@ -1,6 +1,7 @@
 import struct
 import unittest
 from ctypes import windll, byref
+from libutils.constants import *
 
 CMPEAXSHELLCODE_LEN = 5
 MESSAGEBOXSHELLCODE_LEN = 21
@@ -55,7 +56,7 @@ class AsmInstruction:
         return self._offset
 
     def display(self):
-        print '%s:%25s %s' %('0x%08X' %self._offset,' '.join(map(lambda byte: '%02X' %ord(byte), self._opcodes)),self._mnemonic) 
+        print '%s:%25s %s' %('%08X' %self._offset,' '.join(map(lambda byte: '%02X' %ord(byte), self._opcodes)),self._mnemonic) 
 
     def getSize(self):
         return self._size
@@ -178,7 +179,7 @@ class Shellcode:
         self.call(func_addr)
 
     def callByReference(self, func_addr_ptr):
-        self.movDwPtr2Eax(func_addr_ptr)
+        self.movDwPtrDs2Eax(func_addr_ptr)
         self.callEax()
 
     def saveEax(self, addr):
@@ -211,7 +212,7 @@ class Shellcode:
                              )
         self.addAsmInstruction(asm)
 
-    def pushDwPtr(self, ptr):
+    def pushDwPtrDs(self, ptr):
         opcodes = '\xFF\x35' + struct.pack('<I', ptr)
         mnemonic = "MOV DWORD PTR DS:[0x%0X]" %ptr
         asm = AsmInstruction(opcodes,
@@ -229,7 +230,7 @@ class Shellcode:
                              )
         self.addAsmInstruction(asm)
 
-    def movDwPtr2Eax(self, ptr):
+    def movDwPtrDs2Eax(self, ptr):
         opcodes = '\xA1' + struct.pack('<I', ptr)
         mnemonic = "MOV EAX, DWORD PTR DS:[0x%0X]" %ptr
         asm = AsmInstruction(opcodes,
@@ -405,8 +406,8 @@ class TestShellcode(unittest.TestCase):
         
     def test_callEax(self):
         sc = Shellcode(start_offset=0xDEADBEEF)
-        sc.pushDwPtr(0x404111)
-        sc.movDwPtr2Eax(0x77550234)
+        sc.pushDwPtrDs(0x404111)
+        sc.movDwPtrDs2Eax(0x77550234)
         sc.callEax()
         # self.assertEqual(sc.getSize(), 2)
         sc.display()
