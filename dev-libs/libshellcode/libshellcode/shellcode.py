@@ -1,3 +1,6 @@
+"""
+(c) d0hm4t06 3. d0p91m4
+"""
 import struct
 import unittest
 from ctypes import windll, byref
