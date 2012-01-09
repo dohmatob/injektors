@@ -273,6 +273,7 @@ def hack(remote_pid,
                                                                                  )
         shellcode.addShellcode(import_dll_function_failure_notification_shellcode)
         shellcode.jmp(exitthread_EP)
+    # error-handling shellcode
     for seh in [inject_dll_failure_notification_shellcode, 
                 eject_dll_failure_notification_shellcode,
                 ]:
@@ -282,6 +283,7 @@ def hack(remote_pid,
     shellcode.addShellcode(exitthread_shellcode)
     shellcode.display()
     debug("OK (built %d-byte shellcode; EP = 0x%08X)" %(shellcode.getSize(),shellcode_EP))
+    # and then put your egg in the 'big hole' you dug into the remote process's memory ..
     debug("Writing shellcode to remote process memory")
     if not writeRemoteProcessAddressSpace(remote_process_handle,
                                    codecave_addr,
@@ -290,6 +292,7 @@ def hack(remote_pid,
         debug("Couldn't write shellcode to remote process memory")
         return
     debug("OK")
+    # and then crack the egg with a nail or somethx ..
     debug("Deploying remote thread to trigger shellcode in remote process")
     remote_thread_handle, remote_tid = fireupShellcodeInRemoteProcess(remote_process_handle,
                                    shellcode_EP,
@@ -299,6 +302,7 @@ def hack(remote_pid,
         return
     debug("OK (remote tid = %d)" %remote_tid)
     debug("Freeing remote codecave")
+    # and then close-up the 'big hole' ..
     freeCodecaveInRemoteProcess(remote_process_handle,
                                 codecave_addr,
                                 CODECAVE_SIZE,
