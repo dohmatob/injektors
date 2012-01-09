@@ -1,7 +1,7 @@
 # This module implements handly FFIs for stuff like thread enumeration, etc.
 # (c) half-jiffie (dohmatob elvis dopgima)
 from ctypes import *
-from libshellcode.constants import * 
+from libutils.constants import * 
 import sys
 
 kernel32 = windll.kernel32
@@ -27,7 +27,7 @@ def EnumThreads(dwOwnerId=None):
     while kernel32.Thread32Next(hThreadSnap, byref(te32)):
         if te32.th32OwnerProcessID == dwOwnerId: # filter out only those that belong to dwOwnerId
             yield te32
-    CloseHandle(hThreadSnap) # sanity
+    kernel32.CloseHandle(hThreadSnap) # sanity
     
 
 if __name__ == '__main__':
