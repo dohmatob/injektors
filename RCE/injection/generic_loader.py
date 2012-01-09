@@ -4,11 +4,11 @@ from optparse import OptionParser
 from libutils.injector import *
 from libshellcode.shellcode import *
 
-CODECAVE_SIZE = 675
+CODECAVE_SIZE = 0x400
 MAX_DLL_PATHLEN = 100
 MAX_DLL_FUNCTION_LEN = 25
 
-__AUTHOR__ = 'd0hm4t06 3. d0p91m4 (RUDEBOI)'
+__AUTHOR__ = 'd0hm4t06 3. d0p91m4 (half-jiffie)'
 __VERSION__ = '1.0'
 __FULL_VERSION__ = '%s version %s: a tiny code-injector using runtime codecaving technique\r\n(c) %s December 13, 2011 -BORDEAUX' %(os.path.basename(sys.argv[0]),\
                                                                                                                                         __VERSION__,__AUTHOR__)
@@ -33,12 +33,14 @@ def hack(remote_pid,
         debug("\tINJECT PERMANENTLY            : %s" %(not inject_eject))
         debug("\tDLL PAYLOAD FUNCTION          : %s" %dll_function)
     debug("Obtaining remote process handle")
+    # obtain a handle to the remote process ..
     remote_process_handle = getRemoteProcessHandle(remote_pid)
     if not remote_process_handle:
         debug("Couldn't obtain remote process handle")
         return
     debug("OK")
     debug("Allocating %s-byte codecave in remote process")
+    # then cave a 'big hole' in the remote process to contain your egg ..
     codecave_addr = allocateCodecaveInRemoteProcess(remote_process_handle,
                                                     CODECAVE_SIZE,
                                                     )
@@ -166,7 +168,7 @@ def hack(remote_pid,
     |<- END OF BLOCK (exit remote thread)
     ...
     """
-    shellcode = Shellcode(start_offset=codecave_addr)
+    shellcode = Shellcode(start_offset=codecave_addr) # shellcode starts at offset codecave_addr in remote process memory
     err_caption_addr = shellcode.addConstStr("Error")
     eject_dll_failure_notification_txt_addr = shellcode.addConstStr("Couldn't eject %s from remote process" %dll_name)
     if dll_function:
@@ -176,8 +178,8 @@ def hack(remote_pid,
     user32dll_addr = shellcode.addConstStr("user32.dll")
     messagebox_addr = shellcode.addConstStr("MessageBoxA")
     dll_addr = shellcode.addConstStr(dll_path)
-    shellcode_EP = shellcode.getCurrentOffset()
-    exitthread_EP = codecave_addr + CODECAVE_SIZE - EXITTHREADSHELLCODE_LEN
+    shellcode_EP = shellcode.getCurrentOffset() # shellcode Entry-Point
+    exitthread_EP = codecave_addr + CODECAVE_SIZE - EXITTHREADSHELLCODE_LEN 
     freelibraryandexitthread_EP = exitthread_EP - FREELIBRARYANDEXITTHREADSHELLCODE_LEN
     eject_dll_failure_notification_EP = freelibraryandexitthread_EP - MESSAGEBOXSHELLCODE_LEN - UNCONDITIONALJMPSHELLCODE_LEN 
     inject_dll_failure_notification_EP = eject_dll_failure_notification_EP - MESSAGEBOXSHELLCODE_LEN - UNCONDITIONALJMPSHELLCODE_LEN 
@@ -271,6 +273,7 @@ def hack(remote_pid,
                                                                                  )
         shellcode.addShellcode(import_dll_function_failure_notification_shellcode)
         shellcode.jmp(exitthread_EP)
+    # error-handling shellcode
     for seh in [inject_dll_failure_notification_shellcode, 
                 eject_dll_failure_notification_shellcode,
                 ]:
@@ -280,6 +283,7 @@ def hack(remote_pid,
     shellcode.addShellcode(exitthread_shellcode)
     shellcode.display()
     debug("OK (built %d-byte shellcode; EP = 0x%08X)" %(shellcode.getSize(),shellcode_EP))
+    # and then put your egg in the 'big hole' you dug into the remote process's memory ..
     debug("Writing shellcode to remote process memory")
     if not writeRemoteProcessAddressSpace(remote_process_handle,
                                    codecave_addr,
@@ -288,6 +292,7 @@ def hack(remote_pid,
         debug("Couldn't write shellcode to remote process memory")
         return
     debug("OK")
+    # and then crack the egg with a nail or somethx ..
     debug("Deploying remote thread to trigger shellcode in remote process")
     remote_thread_handle, remote_tid = fireupShellcodeInRemoteProcess(remote_process_handle,
                                    shellcode_EP,
@@ -297,6 +302,7 @@ def hack(remote_pid,
         return
     debug("OK (remote tid = %d)" %remote_tid)
     debug("Freeing remote codecave")
+    # and then close-up the 'big hole' ..
     freeCodecaveInRemoteProcess(remote_process_handle,
                                 codecave_addr,
                                 CODECAVE_SIZE,
@@ -305,7 +311,7 @@ def hack(remote_pid,
 
 
 if __name__ == '__main__':
-    usage = "Usage: python %s [options] <remote_pid> <dll_path>\r\n" %sys.argv[0]
+    usage = "Usage: python %s [--inject-eject] [--eject] <remote_pid> <dll_path> [--function <function_name> <function_arg1> <function_arg2> .. <function_argn>]\r\n" %sys.argv[0]
     usage += "\r\nExamples:"
     usage += "\r\n[1] python %s 6408  .\evildll\bin\Debug\evildll.dll --function Initialize" %sys.argv[0]
     usage += "\r\n[2] python %s 6408  .\evildll\bin\Debug\evildll.dll --eject" %sys.argv[0]
