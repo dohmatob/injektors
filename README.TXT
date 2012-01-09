@@ -1,5 +1,5 @@
-+++++++++++++++++++++++++
-+- SECURITY EXCURSIONS -+
-+++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++
++ HERE BE CODE FOR DLLI AND THE ILK +
++++++++++++++++++++++++++++++++++++++
 
-6y d0hm4t06 3. d0p91m4 
+(c) half-jiffie (dohmatob elvis dopgima)
