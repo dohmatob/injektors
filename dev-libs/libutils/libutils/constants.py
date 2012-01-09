@@ -1,6 +1,5 @@
-"""
-(c) d0hm4t06 3. d0p91m4 (RUDEBOI) December 13, 2011 -BORDEAUX
-"""
+# win32api constants and data types
+# (c) half-jiffie (dohmatob elvis dopgima)
 
 from ctypes import *
  
