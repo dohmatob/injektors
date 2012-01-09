@@ -17,7 +17,7 @@ MB_OK = 0x00
 MB_ICONINFORMATION = 0x40
 MB_ICONERROR = 0x10
 
-# Microsoft types
+# Fundamental win32api data types
 HANDLE   = c_void_p
 LPVOID = c_void_p
 DWORD = c_void_p
