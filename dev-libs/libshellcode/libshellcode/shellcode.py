@@ -25,6 +25,8 @@ for api_name in ["ExitThread",
                  "LoadLibraryA",
                  "GetModuleHandleA",
                  "GetProcAddress",
+                 "Sleep",
+                 "SleepEx",
                  ]:
     WINAPI[api_name] = kernel32.GetProcAddress(kernel32_handle,
                                                api_name,
@@ -128,7 +130,7 @@ class Shellcode:
     
     def addConstStr(self, const_str):
         opcodes = const_str + '\x00'
-        mnemonic = 'DB %s,0' %const_str
+        mnemonic = 'DB "%s",0' %const_str
         asm = AsmInstruction(opcodes,
                              mnemonic,
                              self._current_offset,
@@ -154,6 +156,15 @@ class Shellcode:
     def addBlockExitTag(self, tag):
         self._block_exit_tags[self._current_offset] = tag
 
+    def ret(self):
+        opcodes = '\xC3'
+        mnemonic = "RET"
+        asm = AsmInstruction(opcodes,
+                             mnemonic,
+                             self._current_offset
+                             )
+        self.addAsmInstruction(asm)
+        
     def nop(self):
         opcodes = "\x90"
         mnemonic = 'NOP'
@@ -264,6 +275,42 @@ class Shellcode:
                              )
         self.addAsmInstruction(asm)
 
+    def pushAd(self):
+        opcodes = '\x60'
+        mnemonic = "PUSHAD"
+        asm = AsmInstruction(opcodes,
+                             mnemonic,
+                             offset=self._current_offset,
+                             )
+        self.addAsmInstruction(asm)
+
+    def pushFd(self):
+        opcodes = '\x9C'
+        mnemonic = "PUSHFD"
+        asm = AsmInstruction(opcodes,
+                             mnemonic,
+                             offset=self._current_offset,
+                             )
+        self.addAsmInstruction(asm)
+
+    def popAd(self):
+        opcodes = '\x61'
+        mnemonic = "POPAD"
+        asm = AsmInstruction(opcodes,
+                             mnemonic,
+                             offset=self._current_offset,
+                             )
+        self.addAsmInstruction(asm)
+
+    def popFd(self):
+        opcodes = '\x9D'
+        mnemonic = "POPFD"
+        asm = AsmInstruction(opcodes,
+                             mnemonic,
+                             offset=self._current_offset,
+                             )
+        self.addAsmInstruction(asm)
+
     def pushDwPtrDs(self, ptr):
         opcodes = '\xFF\x35' + struct.pack('<I', ptr)
         mnemonic = "PUSH DWORD PTR DS:[0x%0X]" %ptr
@@ -292,7 +339,22 @@ class Shellcode:
         self.addAsmInstruction(asm)
 
 
+class SleepExShellcode(Shellcode):
+    def __init__(self,
+                 nb_milliseconds=INFINITE,
+                 alertable=1,
+                 start_offset=0,
+                 pseudo='invoke SleepEx',
+                 ):
+        Shellcode.__init__(self, 
+                           start_offset=start_offset,
+                           pseudo=pseudo,
+                           )
+        self.push(alertable)
+        self.push(nb_milliseconds)
+        self.call(WINAPI["SleepEx"])
 
+    
 class ExitThreadShellcode(Shellcode):
     """
     instantiates an egg like:
