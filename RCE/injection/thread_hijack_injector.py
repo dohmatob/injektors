@@ -7,7 +7,7 @@ from optparse import OptionParser
 
 kernel32 = windll.kernel32
 
-MAX_DLL_PATHLEN = 1000
+MAX_DLL_PATHLEN = 100
 CODECAVE_SIZE = 0x400
 MAX_DLL_FUNCTION_LEN = 25
 
