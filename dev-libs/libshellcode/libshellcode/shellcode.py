@@ -6,6 +6,7 @@ import unittest
 from ctypes import windll, byref
 from libutils.constants import *
 
+# exported constants
 CMPEAXSHELLCODE_LEN = 5
 MESSAGEBOXSHELLCODE_LEN = 21
 EXITTHREADSHELLCODE_LEN = 9
@@ -16,8 +17,10 @@ GETPROCADDRESSSHELLCODE_LEN = 18
 UNCONDITIONALJMPSHELLCODE_LEN = 5
 CONDITIONALJMPSHELLCODE_LEN = 6
 
+# position-independent (unrebased) APIs
 kernel32 = windll.kernel32
-kernel32_handle = kernel32.GetModuleHandleA("kernel32.dll")
+kernel32dll_handle = kernel32.GetModuleHandleA("kernel32.dll")
+user32dll_handle = kernel32.GetModuleHandleA("user32.dll")
 WINAPI = dict()
 for api_name in ["ExitThread", 
                  "FreeLibraryAndExitThread", 
@@ -28,7 +31,12 @@ for api_name in ["ExitThread",
                  "Sleep",
                  "SleepEx",
                  ]:
-    WINAPI[api_name] = kernel32.GetProcAddress(kernel32_handle,
+    WINAPI[api_name] = kernel32.GetProcAddress(kernel32dll_handle,
+                                               api_name,
+                                               )
+for api_name in ["MessageBoxA",
+                 ]:
+    WINAPI[api_name] = kernel32.GetProcAddress(user32dll_handle,
                                                api_name,
                                                )
 
@@ -389,8 +397,7 @@ class FreeLibraryAndExitThreadShellcode(Shellcode):
         self._dll_addr = dll_addr
         self.push(0x0)
         self.pushDwPtrDs(dll_addr)
-        self.mov2Eax(WINAPI["FreeLibraryAndExitThread"])
-        self.callEax()
+        self.call(WINAPI["FreeLibraryAndExitThread"])
 
 
 class LoadLibraryShellcode(Shellcode):
@@ -405,8 +412,7 @@ class LoadLibraryShellcode(Shellcode):
                            )
         self._dll_addr = dll_addr
         self.push(dll_addr)
-        self.mov2Eax(WINAPI['LoadLibraryA'])
-        self.callEax()
+        self.call(WINAPI['LoadLibraryA'])
 
 
 class FreeLibraryShellcode(Shellcode):
@@ -429,8 +435,7 @@ class FreeLibraryShellcode(Shellcode):
                            )
         self._dll_addr = dll_addr
         self.pushDwPtrDs(dll_addr)
-        self.mov2Eax(WINAPI['FreeLibrary'])
-        self.callEax()
+        self.call(WINAPI['FreeLibrary'])
                  
 
 class GetModuleHandleShellcode(Shellcode):
@@ -469,9 +474,8 @@ class GetProcAddressShellcode(Shellcode):
                            )
         self.push(func_name)
         self.pushDwPtrDs(dll_handle)
-        self.mov2Eax(WINAPI['GetProcAddress'])
-        self.callEax()
-
+        self.call(WINAPI['GetProcAddress'])
+        
 
 class MessageBoxShellcode(Shellcode):
     """
@@ -486,7 +490,6 @@ class MessageBoxShellcode(Shellcode):
     ...
     """
     def __init__(self,
-                 msgb_addr,
                  txt_addr,
                  caption_addr,
                  kind=MB_OK | MB_ICONINFORMATION,
@@ -501,7 +504,7 @@ class MessageBoxShellcode(Shellcode):
         self.push(caption_addr)
         self.push(txt_addr)
         self.push(0x0)
-        self.callByReference(msgb_addr)
+        self.call(WINAPI["MessageBoxA"])
 
 
 class TestAsmInstruction(unittest.TestCase):

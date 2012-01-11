@@ -1,5 +1,5 @@
 from libshellcode.shellcode import *
-from libutils.debug import EnumThreads
+from libutils.debug import *
 from ctypes import *
 import sys
 import os
@@ -8,7 +8,7 @@ from optparse import OptionParser
 kernel32 = windll.kernel32
 
 MAX_DLL_PATHLEN = 200
-CODECAVE_SIZE = 0x400
+CODECAVE_SIZE = 535
 MAX_DLL_FUNCTION_LEN = 25
 
 __AUTHOR__ = 'd0hm4t06 3. d0p91m4 (half-jiffie)'
@@ -50,11 +50,10 @@ def hijack(remote_pid,
         print "Error: couldn't allocate remote code-cave."
         sys.exit(1)
     print "Obtaining remote process primary thread ID .."
-    te32_generator = EnumThreads(remote_pid)
-    for te32 in te32_generator:
-        # XXX filter
-        primary_tid = te32.th32ThreadID
-        break
+    primary_tid = GetPrimaryThreadId(remote_pid)
+    if not primary_tid:
+        print "Couln't obtain remote process primary thread"
+        sys.exit(0)
     print "OK (primary thread ID = %d)." %primary_tid
     print "Obtainging handle to remote process primary thread handle .."
     primary_thread_handle = kernel32.OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT | THREAD_SUSPEND_RESUME,
@@ -69,104 +68,97 @@ def hijack(remote_pid,
     """
     The following code stub will generate shellcode similar to (strings stripped):
     ..
-     ->| START OF BLOCK (carrier thread's prolog)
-     00260151:           68 44 63 C0 77 PUSH 0x77C06344
-     00260156:                       60 PUSHAD
-     00260157:                       9C PUSHFD
-     ->| START OF BLOCK (load user32.Dll)
-     00260158:           68 32 00 26 00 PUSH 0x260032
-     0026015D:           B8 04 28 0F 76 MOV EAX, 0x760F2804
-     00260162:                    FF D0 CALL EAX
-     |<- END OF BLOCK (load user32.Dll)
-     00260164:           A3 32 00 26 00 MOV DWORD PTR DS:[00260032], EAX
-     ->| START OF BLOCK (import MessageBoxA)
-     00260169:           68 3D 00 26 00 PUSH 0x26003D
-     0026016E:        FF 35 32 00 26 00 PUSH DWORD PTR DS:[0x260032]
-     00260174:           B8 D7 17 0F 76 MOV EAX, 0x760F17D7
-     00260179:                    FF D0 CALL EAX
-     |<- END OF BLOCK (import MessageBoxA)
-     0026017B:           A3 3D 00 26 00 MOV DWORD PTR DS:[0026003D], EAX
-     ->| START OF BLOCK (get inlinedetoursclientdll.dll handle)
-     00260180:           68 E1 00 26 00 PUSH 0x2600E1
-     00260185:           B8 77 28 0F 76 MOV EAX, 0x760F2877
-     0026018A:                    FF D0 CALL EAX
-     |<- END OF BLOCK (get inlinedetoursclientdll.dll handle)
-     0026018C:           3D 00 00 00 00 CMP EAX, 0x0
-     00260191:        0F 84 0A 00 00 00 JZ 0x2601A1
-     00260197:           A3 E1 00 26 00 MOV DWORD PTR DS:[002600E1], EAX
-     0026019C:           E9 1C 00 00 00 JMP 0x2601BD
-     ->| START OF BLOCK (load inlinedetoursclientdll.dll)
-     002601A1:           68 E1 00 26 00 PUSH 0x2600E1
-     002601A6:           B8 04 28 0F 76 MOV EAX, 0x760F2804
-     002601AB:                    FF D0 CALL EAX
-     |<- END OF BLOCK (load inlinedetoursclientdll.dll)
-     002601AD:           3D 00 00 00 00 CMP EAX, 0x0
-     002601B2:        0F 84 30 02 00 00 JZ 0x2603E8
-     002601B8:           A3 E1 00 26 00 MOV DWORD PTR DS:[002600E1], EAX
-     ->| START OF BLOCK (import HookSleepEx)
-     002601BD:           68 49 00 26 00 PUSH 0x260049
-     002601C2:        FF 35 E1 00 26 00 PUSH DWORD PTR DS:[0x2600E1]
-     002601C8:           B8 D7 17 0F 76 MOV EAX, 0x760F17D7
-     002601CD:                    FF D0 CALL EAX
-     |<- END OF BLOCK (import HookSleepEx)
-     002601CF:           A3 49 00 26 00 MOV DWORD PTR DS:[00260049], EAX
-     002601D4:           3D 00 00 00 00 CMP EAX, 0x0
-     002601D9:        0F 84 C3 01 00 00 JZ 0x2603A2
-     ->| START OF BLOCK (invoke HookSleepEx(..))
-     002601DF:           A1 49 00 26 00 MOV EAX, DWORD PTR DS:[0x260049]
-     002601E4:                    FF D0 CALL EAX
-     |<- END OF BLOCK (invoke HookSleepEx(..))
-     ->| START OF BLOCK (NOP-sled)
-     002601E6:                       90 NOP
-     002601E7:                       90 NOP
-     ..
-     0026039B:                       90 NOP
-     0026039C:                       90 NOP
-     |<- END OF BLOCK (NOP-sled)
-     0026039D:           E9 5B 00 00 00 JMP 0x2603FD
-     ->| START OF BLOCK (failed inlinedetoursclientdll.dll ejection notification)
-     002603CE:                    6A 10 PUSH 0x10
-     002603D0:           68 00 00 26 00 PUSH 0x260000
-     002603D5:           68 BA 00 26 00 PUSH 0x2600BA
-     002603DA:                    6A 00 PUSH 0x0
-     002603DC:           A1 3D 00 26 00 MOV EAX, DWORD PTR DS:[0x26003D]
-     002603E1:                    FF D0 CALL EAX
-     |<- END OF BLOCK (failed HookSleepEx(..) from inlinedetoursclientdll.dll notification)
-     002603B7:           E9 41 00 00 00 JMP 0x2603FD
-     ->| START OF BLOCK (unload inlinedetoursclientdll.dll)
-     002603BC:        FF 35 E1 00 26 00 PUSH DWORD PTR DS:[0x2600E1]
-     002603C2:           B8 89 19 0F 76 MOV EAX, 0x760F1989
-     002603C7:                    FF D0 CALL EAX
-     |<- END OF BLOCK (unload inlinedetoursclientdll.dll)
-     002603C9:           E9 2F 00 00 00 JMP 0x2603FD
-     ->| START OF BLOCK (failed inlinedetoursclientdll.dll ejection notification)
-     002603CE:                    6A 10 PUSH 0x10
-     002603D0:           68 00 00 26 00 PUSH 0x260000
-     002603D5:           68 BA 00 26 00 PUSH 0x2600BA
-     002603DA:                    6A 00 PUSH 0x0
-     002603DC:           A1 3D 00 26 00 MOV EAX, DWORD PTR DS:[0x26003D]
-     002603E1:                    FF D0 CALL EAX
-     |<- END OF BLOCK (failed inlinedetoursclientdll.dll ejection notification)
-     002603E3:           E9 15 00 00 00 JMP 0x2603FD
-     ->| START OF BLOCK (failed inlinedetoursclientdll.dll injection notification)
-     002603E8:                    6A 10 PUSH 0x10
-     002603EA:           68 00 00 26 00 PUSH 0x260000
-     002603EF:           68 92 00 26 00 PUSH 0x260092
-     002603F4:                    6A 00 PUSH 0x0
-     002603F6:           A1 3D 00 26 00 MOV EAX, DWORD PTR DS:[0x26003D]
-     002603FB:                    FF D0 CALL EAX
-     |<- END OF BLOCK (failed inlinedetoursclientdll.dll injection notification)
-     ->| START OF BLOCK (carrier thread's epilog)
-     002603FD:                       9D POPFD
-     002603FE:                       61 POPAD
-     002603FF:                       C3 RET
-     |<- END OF BLOCK (carrier thread's epilog)
+    ->| START OF BLOCK (carrier thread's prolog)
+    0072013A:           68 3A 01 71 00 PUSH 0x71013A
+    0072013F:                       60 PUSHAD
+    00720140:                       9C PUSHFD
+    ->| START OF BLOCK (get inlinedetoursclientdll.dll handle)
+    00720141:           68 CA 00 72 00 PUSH 0x7200CA
+    00720146:           B8 77 28 0F 76 MOV EAX, 0x760F2877
+    0072014B:                    FF D0 CALL EAX
+    |<- END OF BLOCK (get inlinedetoursclientdll.dll handle)
+    0072014D:           3D 00 00 00 00 CMP EAX, 0x0
+    00720152:        0F 84 0A 00 00 00 JZ 0x720162
+    00720158:           A3 CA 00 72 00 MOV DWORD PTR DS:[007200CA], EAX
+    0072015D:           E9 1C 00 00 00 JMP 0x72017E
+    ->| START OF BLOCK (load inlinedetoursclientdll.dll)
+    00720162:           68 CA 00 72 00 PUSH 0x7200CA
+    00720167:           B8 04 28 0F 76 MOV EAX, 0x760F2804
+    0072016C:                    FF D0 CALL EAX
+    |<- END OF BLOCK (load inlinedetoursclientdll.dll)
+    0072016E:           3D 00 00 00 00 CMP EAX, 0x0
+    00720173:        0F 84 86 00 00 00 JZ 0x7201FF
+    00720179:           A3 CA 00 72 00 MOV DWORD PTR DS:[007200CA], EAX
+    ->| START OF BLOCK (import HookSleepEx)
+    0072017E:           68 32 00 72 00 PUSH 0x720032
+    00720183:        FF 35 CA 00 72 00 PUSH DWORD PTR DS:[0x7200CA]
+    00720189:           B8 D7 17 0F 76 MOV EAX, 0x760F17D7
+    0072018E:                    FF D0 CALL EAX
+    |<- END OF BLOCK (import HookSleepEx)
+    00720190:           A3 32 00 72 00 MOV DWORD PTR DS:[00720032], EAX
+    00720195:           3D 00 00 00 00 CMP EAX, 0x0
+    0072019A:        0F 84 19 00 00 00 JZ 0x7201B9
+    ->| START OF BLOCK (invoke HookSleepEx(..))
+    007201A0:           A1 32 00 72 00 MOV EAX, DWORD PTR DS:[0x720032]
+    007201A5:                    FF D0 CALL EAX
+    |<- END OF BLOCK (invoke HookSleepEx(..))
+    ->| START OF BLOCK (NOP-sled)
+    007201A7:                       90 NOP
+    007201A8:                       90 NOP
+    007201A9:                       90 NOP
+    007201AA:                       90 NOP
+    007201AB:                       90 NOP
+    007201AC:                       90 NOP
+    007201AD:                       90 NOP
+    007201AE:                       90 NOP
+    007201AF:                       90 NOP
+    007201B0:                       90 NOP
+    007201B1:                       90 NOP
+    007201B2:                       90 NOP
+    007201B3:                       90 NOP
+    |<- END OF BLOCK (NOP-sled)
+    007201B4:           E9 5B 00 00 00 JMP 0x720214
+    ->| START OF BLOCK (failed inlinedetoursclientdll.dll ejection notification)
+    007201E5:                    6A 10 PUSH 0x10
+    007201E7:           68 00 00 72 00 PUSH 0x720000
+    007201EC:           68 A3 00 72 00 PUSH 0x7200A3
+    007201F1:                    6A 00 PUSH 0x0
+    007201F3:           B8 71 EA 61 76 MOV EAX, 0x7661EA71
+    007201F8:                    FF D0 CALL EAX
+    |<- END OF BLOCK (failed HookSleepEx(..) from inlinedetoursclientdll.dll notificati
+    007201CE:           E9 41 00 00 00 JMP 0x720214
+    ->| START OF BLOCK (unload inlinedetoursclientdll.dll)
+    007201D3:        FF 35 CA 00 72 00 PUSH DWORD PTR DS:[0x7200CA]
+    007201D9:           B8 89 19 0F 76 MOV EAX, 0x760F1989
+    007201DE:                    FF D0 CALL EAX
+    |<- END OF BLOCK (unload inlinedetoursclientdll.dll)
+    007201E0:           E9 2F 00 00 00 JMP 0x720214
+    ->| START OF BLOCK (failed inlinedetoursclientdll.dll ejection notification)
+    007201E5:                    6A 10 PUSH 0x10
+    007201E7:           68 00 00 72 00 PUSH 0x720000
+    007201EC:           68 A3 00 72 00 PUSH 0x7200A3
+    007201F1:                    6A 00 PUSH 0x0
+    007201F3:           B8 71 EA 61 76 MOV EAX, 0x7661EA71
+    007201F8:                    FF D0 CALL EAX
+    |<- END OF BLOCK (failed inlinedetoursclientdll.dll ejection notification)
+    007201FA:           E9 15 00 00 00 JMP 0x720214
+    ->| START OF BLOCK (failed inlinedetoursclientdll.dll injection notification)
+    007201FF:                    6A 10 PUSH 0x10
+    00720201:           68 00 00 72 00 PUSH 0x720000
+    00720206:           68 7B 00 72 00 PUSH 0x72007B
+    0072020B:                    6A 00 PUSH 0x0
+    0072020D:           B8 71 EA 61 76 MOV EAX, 0x7661EA71
+    00720212:                    FF D0 CALL EAX
+    |<- END OF BLOCK (failed inlinedetoursclientdll.dll injection notification)
+    ->| START OF BLOCK (carrier thread's epilog)
+    00720214:                       9D POPFD
+    00720215:                       61 POPAD
+    00720216:                       C3 RET
+    |<- END OF BLOCK (carrier thread's epilog)
     ..
     """
     shellcode = Shellcode(start_offset=codecave_addr)
-    err_caption_addr = shellcode.addConstStr("%s: Error:" %sys.argv[0])
-    user32dll_addr = shellcode.addConstStr("user32.dll")
-    messagebox_addr = shellcode.addConstStr("MessageBoxA")
+    err_caption_remote_addr = shellcode.addConstStr("%s: Error:" %sys.argv[0]) 
     if dll_function:
         dll_function_remote_addr = shellcode.addConstStr(dll_function)
         import_dll_function_failure_txt_addr = shellcode.addConstStr("Can't import %s(..) from %s" %(dll_function, dll_name))
@@ -189,24 +181,21 @@ def hijack(remote_pid,
     shellcode.pushAd()
     shellcode.pushFd()
     shellcode.addBlockEntryTag("carrier thread's prolog")
-    injection_failure_shellcode = MessageBoxShellcode(messagebox_addr,
-                                                      injection_failure_err_txt_addr,
-                                                      err_caption_addr,
+    injection_failure_shellcode = MessageBoxShellcode(injection_failure_err_txt_addr,
+                                                      err_caption_remote_addr,
                                                       kind=MB_ICONERROR,
                                                       pseudo="failed %s injection notification" %dll_name,
                                                       start_offset=injection_failure_EP,
                                                       )
-    ejection_failure_shellcode = MessageBoxShellcode(messagebox_addr,
-                                                     ejection_failure_err_txt_addr,
-                                                     err_caption_addr,
+    ejection_failure_shellcode = MessageBoxShellcode(ejection_failure_err_txt_addr,
+                                                     err_caption_remote_addr,
                                                      kind=MB_ICONERROR,
                                                      pseudo="failed %s ejection notification" %dll_name,
                                                      start_offset=ejection_failure_EP,
                                                      )
     if dll_function:
-        import_dll_function_failure_shellcode = MessageBoxShellcode(messagebox_addr,
-                                                                    import_dll_function_failure_txt_addr,
-                                                                    err_caption_addr,
+        import_dll_function_failure_shellcode = MessageBoxShellcode(import_dll_function_failure_txt_addr,
+                                                                    err_caption_remote_addr,
                                                                     kind=MB_ICONERROR,
                                                                     pseudo="failed %s(..) from %s notification" %(dll_function,dll_name),
                                                                     start_offset=ejection_failure_EP,
@@ -215,19 +204,6 @@ def hijack(remote_pid,
                                                 pseudo="unload %s" %dll_name,
                                                 start_offset=unload_dll_EP,
                                                 )
-    load_user32dll_shellcode = LoadLibraryShellcode(user32dll_addr,
-                                                    start_offset=shellcode.getCurrentOffset(),
-                                                    pseudo="load user32.Dll",
-                                                    )
-    shellcode.addShellcode(load_user32dll_shellcode)
-    shellcode.saveEax(user32dll_addr)
-    import_messagebox_shellcode = GetProcAddressShellcode(user32dll_addr,
-                                                          messagebox_addr,
-                                                          start_offset=shellcode.getCurrentOffset(),
-                                                          pseudo="import MessageBoxA",
-                                                          )
-    shellcode.addShellcode(import_messagebox_shellcode)
-    shellcode.saveEax(messagebox_addr)
     get_dll_handle_shellcode = GetModuleHandleShellcode(dll_remote_addr,
                                                         start_offset=shellcode.getCurrentOffset(),
                                                         pseudo="get %s handle" %dll_name,
