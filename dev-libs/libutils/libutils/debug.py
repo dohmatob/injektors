@@ -6,6 +6,17 @@ import sys
 
 kernel32 = windll.kernel32
 
+def GetPrimaryThreadId(dwOwnerId):
+    """
+    Returns ID main/primary thread in given process
+    """
+    dwMainThreadId = None
+    for te32 in EnumThreads(dwOwnerId):
+        # XXX search of appropriate thread using creationg time, etc., heuristics
+        dwMainThreadId = te32.th32ThreadID
+        break
+    return dwMainThreadId
+        
 def EnumThreads(dwOwnerId=None):
     """
     Yields a THREADENTRY32 objects generator for threads of the given process
