@@ -67,7 +67,7 @@ def hijack(remote_pid,
     print "OK."
     print "Building shellcode .."
     """
-    The following code stub will generate shellcode-code similar to (strings stripped):
+    The following code stub will generate shellcode similar to (strings stripped):
     ..
      ->| START OF BLOCK (carrier thread's prolog)
      00260151:           68 44 63 C0 77 PUSH 0x77C06344
