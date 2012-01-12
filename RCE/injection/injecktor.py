@@ -42,7 +42,6 @@ def hack(target_pid,
         printDebug("\tDLL FUNCTION     : %s" %dll_function)
         if dll_function_args:
             printDebug("\tDLL FUNCTION ARGS: %s" %' '.join(dll_functionargs))
-    return                 
     # obtain handle to target process
     printDebug("Obtaining handle to target process ..")
     target_process_handle = windll.kernel32.OpenProcess(PROCESS_ALL_ACCESS,
