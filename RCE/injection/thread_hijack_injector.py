@@ -8,7 +8,7 @@ from optparse import OptionParser
 kernel32 = windll.kernel32
 
 MAX_DLL_PATHLEN = 200
-CODECAVE_SIZE = 535
+CODECAVE_SIZE = 600
 MAX_DLL_FUNCTION_LEN = 25
 
 __AUTHOR__ = 'd0hm4t06 3. d0p91m4 (half-jiffie)'
@@ -19,7 +19,9 @@ def hijack(remote_pid,
            dll_path,
            eject=False,
            dll_function=None,
-           dll_function_args=None):
+           dll_function_args=None,
+           createremotethread=1,
+           ):
     dll_name = os.path.basename(dll_path)
     print "++CONFIGURATION++"
     print "\tREMOTE PID                    : %s" %remote_pid
@@ -50,20 +52,21 @@ def hijack(remote_pid,
         print "Error: couldn't allocate remote code-cave."
         sys.exit(1)
     print "Obtaining remote process primary thread ID .."
-    primary_tid = GetPrimaryThreadId(remote_pid)
-    if not primary_tid:
-        print "Couln't obtain remote process primary thread"
-        sys.exit(0)
-    print "OK (primary thread ID = %d)." %primary_tid
-    print "Obtainging handle to remote process primary thread handle .."
-    primary_thread_handle = kernel32.OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT | THREAD_SUSPEND_RESUME,
-                                                0,
-                                                primary_tid,
-                                                )
-    if not primary_thread_handle:
-        print "Error: couldn't obtain remote process primary thread."
-        sys.exit(1)  
-    print "OK."
+    if not createremotethread:
+        primary_tid = GetPrimaryThreadId(remote_pid)
+        if not primary_tid:
+            print "Couln't obtain remote process primary thread"
+            sys.exit(0)
+        print "OK (primary thread ID = %d)." %primary_tid
+        print "Obtainging handle to remote process primary thread handle .."
+        primary_thread_handle = kernel32.OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT | THREAD_SUSPEND_RESUME,
+                                                    0,
+                                                    primary_tid,
+                                                    )
+        if not primary_thread_handle:
+            print "Error: couldn't obtain remote process primary thread."
+            sys.exit(1)  
+        print "OK."
     print "Building shellcode .."
     """
     The following code stub will generate shellcode similar to (strings stripped):
@@ -167,20 +170,26 @@ def hijack(remote_pid,
     dll_remote_addr = shellcode.addConstStr(dll_path)
     entry_point = shellcode.getCurrentOffset()
     prolog = codecave_addr + CODECAVE_SIZE - 1 - 1 - 1
+    if createremotethread:
+        exitthread_EP = codecave_addr + CODECAVE_SIZE - EXITTHREADSHELLCODE_LEN
+        freelibraryandexitthread_EP = exitthread_EP - FREELIBRARYANDEXITTHREADSHELLCODE_LEN - UNCONDITIONALJMPSHELLCODE_LEN
+        prolog = exitthread_EP
+    else:
+        unload_dll_EP = prolog - FREELIBRARYSHELLCODE_LEN -  UNCONDITIONALJMPSHELLCODE_LEN
     injection_failure_EP = prolog - MESSAGEBOXSHELLCODE_LEN 
     ejection_failure_EP = injection_failure_EP - MESSAGEBOXSHELLCODE_LEN - UNCONDITIONALJMPSHELLCODE_LEN
-    unload_dll_EP = ejection_failure_EP - FREELIBRARYSHELLCODE_LEN -  UNCONDITIONALJMPSHELLCODE_LEN
-    seh_EP = unload_dll_EP
+    seh_EP = ejection_failure_EP
     if dll_function:
         import_dll_function_failure_EP = seh_EP = unload_dll_EP - MESSAGEBOXSHELLCODE_LEN - UNCONDITIONALJMPSHELLCODE_LEN
-    ctx = CONTEXT(0)
-    ctx.ContextFlags = CONTEXT_CONTROL
-    kernel32.GetThreadContext(primary_thread_handle, byref(ctx))
-    shellcode.addBlockEntryTag("carrier thread's prolog")
-    shellcode.push(ctx.Eip)
-    shellcode.pushAd()
-    shellcode.pushFd()
-    shellcode.addBlockEntryTag("carrier thread's prolog")
+    if not createremotethread:
+        ctx = CONTEXT(0)
+        ctx.ContextFlags = CONTEXT_CONTROL
+        kernel32.GetThreadContext(primary_thread_handle, byref(ctx))
+        shellcode.addBlockEntryTag("carrier thread's prolog")
+        shellcode.push(ctx.Eip)
+        shellcode.pushAd()
+        shellcode.pushFd()
+        shellcode.addBlockEntryTag("carrier thread's prolog")
     injection_failure_shellcode = MessageBoxShellcode(injection_failure_err_txt_addr,
                                                       err_caption_remote_addr,
                                                       kind=MB_ICONERROR,
@@ -193,6 +202,14 @@ def hijack(remote_pid,
                                                      pseudo="failed %s ejection notification" %dll_name,
                                                      start_offset=ejection_failure_EP,
                                                      )
+    if createremotethread:
+        freelibraryandexitthread_shellcode = FreeLibraryAndExitThreadShellcode(dll_remote_addr,
+                                                                               pseudo="unload %s and exith thread" %dll_name,
+                                                                               start_offset=freelibraryandexitthread_EP,
+                                                                               )
+        exitthread_shellcode = ExitThreadShellcode(pseudo="exit thread",
+                                                   start_offset=exitthread_EP,
+                                                   )
     if dll_function:
         import_dll_function_failure_shellcode = MessageBoxShellcode(import_dll_function_failure_txt_addr,
                                                                     err_caption_remote_addr,
@@ -216,7 +233,10 @@ def hijack(remote_pid,
         shellcode.jz(shellcode.getCurrentOffset() + CONDITIONALJMPSHELLCODE_LEN + 5 + UNCONDITIONALJMPSHELLCODE_LEN) 
     shellcode.saveEax(dll_remote_addr)
     if eject:
-        shellcode.jmp(unload_dll_EP)
+        if not createremotethread:
+            shellcode.jmp(unload_dll_EP)
+        else:
+            shellcode.jmp(freelibraryandexitthread_EP)
     else:
         shellcode.jmp(shellcode.getCurrentOffset() + UNCONDITIONALJMPSHELLCODE_LEN + LOADLIBRARYSHELLCODE_LEN + 5 + CONDITIONALJMPSHELLCODE_LEN + 5)
     load_dll_shellcode = LoadLibraryShellcode(dll_remote_addr,
@@ -255,13 +275,18 @@ def hijack(remote_pid,
         shellcode.addShellcode(seh)
         shellcode.jmp(prolog)
     shellcode.addShellcode(injection_failure_shellcode)
-    shellcode.addBlockEntryTag("carrier thread's epilog")
-    shellcode.popFd()
-    shellcode.popAd()
-    shellcode.ret()
-    shellcode.addBlockExitTag("carrier thread's epilog")
+    if createremotethread:
+        shellcode.addShellcode(freelibraryandexitthread_shellcode)
+        # shellcode.jmp(prolog)
+        shellcode.addShellcode(exitthread_shellcode)
+    else:
+        shellcode.addBlockEntryTag("carrier thread's epilog")
+        shellcode.popFd()
+        shellcode.popAd()
+        shellcode.ret()
+        shellcode.addBlockExitTag("carrier thread's epilog")
     shellcode.display()
-    # sys.exit(0)
+    sys.exit(0)
     print "OK (%d-byte shellcode built; Entry Point = 0x%08X)." %(shellcode.getSize(), entry_point)
     print "Copying shellcode to remote code-cave .."
     bytes_written = DWORD(0)
@@ -275,11 +300,28 @@ def hijack(remote_pid,
     if not copy_OK:
         print "Error: couldn't copy shellcode to remote code-cave."
     print "OK."
-    print "Hijacking remote process primary thread to execute shellcod for us .."
-    ctx.Eip = entry_point
-    kernel32.SetThreadContext(primary_thread_handle, byref(ctx))
-    kernel32.ResumeThread(primary_thread_handle)
-    print "OK."
+    if createremotethread:
+        remote_tid = DWORD(0)
+        print "Creating remote thread to trigger shellcode .."
+        remote_thread_handle = kernel32.CreateRemoteThread(remote_process_handle,
+                                                  0,
+                                                  0,
+                                                  entry_point,
+                                                  0,
+                                                  0,
+                                                  byref(remote_tid),
+                                                  )
+        if not remote_thread_handle:
+            print "Couldn't create remote thread"
+            sys.exit(0)
+        kernel32.WaitForSingleObject(remote_thread_handle, INFINITE)
+        print "OK (remote thread ID = %d" %remote_tid.value
+    else:
+        print "Hijacking remote process primary thread to execute shellcod for us .."
+        ctx.Eip = entry_point
+        kernel32.SetThreadContext(primary_thread_handle, byref(ctx))
+        kernel32.ResumeThread(primary_thread_handle)
+        print "OK."
 
 if __name__ == "__main__":
     usage = "Usage: python %s [--eject] <remote_pid> <dll_path> [--function <function_name> <function_arg1> <function_arg2> .. <function_argn>]\r\n" %sys.argv[0]
