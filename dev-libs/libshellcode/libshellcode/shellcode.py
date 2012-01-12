@@ -157,6 +157,16 @@ class Shellcode:
         self._current_offset += shellcode.getSize()
         if shellcode.getPseudo():
             self._block_exit_tags[self._current_offset] = shellcode.getPseudo()
+        for offset, tag in shellcode.getBlockEntryTags().iteritems():
+            self._block_entry_tags[offset] = tag
+        for offset, tag in shellcode.getBlockExitTags().iteritems():
+            self._block_exit_tags[offset] = tag
+
+    def getBlockEntryTags(self):
+        return self._block_entry_tags
+
+    def getBlockExitTags(self):
+        return self._block_exit_tags
 
     def addBlockEntryTag(self, tag):
         self._block_entry_tags[self._current_offset] = tag
