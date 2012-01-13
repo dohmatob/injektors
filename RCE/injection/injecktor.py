@@ -1,3 +1,6 @@
+"""
+(c) d0hm4t06 3. d0p91m4 (h4lf-jiffie)
+"""
 from libshellcode.shellcode import *
 from libutils.constants import *
 from libutils.debug import *
@@ -41,7 +44,7 @@ def hack(target_pid,
     if dll_function:
         printDebug("\tDLL FUNCTION     : %s" %dll_function)
         if dll_function_args:
-            printDebug("\tDLL FUNCTION ARGS: %s" %' '.join(dll_functionargs))
+            printDebug("\tDLL FUNCTION ARGS: %s" %' '.join(dll_function_args))
     # obtain handle to target process
     printDebug("Obtaining handle to target process ..")
     target_process_handle = windll.kernel32.OpenProcess(PROCESS_ALL_ACCESS,
@@ -257,6 +260,7 @@ def hack(target_pid,
                                          byref(primary_thread_ctx),
                                          )
         windll.kernel32.ResumeThread(primary_thread_handle)
+        windll.kernel32.WaitForSingleObject(primary_thread_handle, INFINITE)
         printDebug("OK.")
     # free code-cave
     printDebug("Freeing code-cave in target process ..")
