@@ -1,5 +1,8 @@
-# This module implements handly FFIs for stuff like thread enumeration, etc.
-# (c) half-jiffie (dohmatob elvis dopgima)
+"""
+This module implements handy win32 FFIs (Foreign-Function Interfaces) for stuff like thread enumeration, etc.
+
+(c) half-jiffie (dohmatob elvis dopgima)
+"""
 from ctypes import *
 from libutils.constants import * 
 import sys
