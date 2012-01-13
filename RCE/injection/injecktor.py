@@ -15,7 +15,7 @@ MAX_DLL_FUNCTION_LEN = 25
 
 __AUTHOR__ = 'd0hm4t06 3. d0p91m4 (half-jiffie)'
 __VERSION__ = '1.0dev'
-__FULL_VERSION__ = '%s version %s: a tiny code-injector using thread-hijack technique\r\n(c) %s' %(os.path.basename(sys.argv[0]),__VERSION__,__AUTHOR__)
+__FULL_VERSION__ = '%s version %s: a tiny code-injector using thread-hijack and CreateRemoteThread techniques\r\n(c) %s' %(os.path.basename(sys.argv[0]),__VERSION__,__AUTHOR__)
 
 
 def printDebug(msg):
