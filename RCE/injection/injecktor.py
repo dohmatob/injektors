@@ -272,10 +272,10 @@ def hack(target_pid,
     printDebug("OK.")
 
 if __name__ == "__main__":
-    usage = "Usage: python %s [--eject] <remote_pid> <dll_path> [--function <function_name> <function_arg1> <function_arg2> .. <function_argn>]\r\n" %sys.argv[0]
-    usage += "\r\nExamples:"
-    usage += "\r\n[1] python %s 6408  .\evildll\bin\Debug\evildll.dll --function Initialize" %sys.argv[0]
-    usage += "\r\n[2] python %s 6408  .\evildll\bin\Debug\evildll.dll --eject" %sys.argv[0]
+    usage = "Usage: python %s [--eject] <target_proc_name_or_id> <dll_path> [--function <function_name> <function_arg1> <function_arg2> .. <function_argn>]\r\n" %sys.argv[0]
+    usage += "\r\n+++Examples+++"
+    usage += "\r\n[1] Eject evildll.dll from process with ID = 6408:\r\n\tpython %s 6408  evildll.dll --eject" %sys.argv[0]
+    usage += "\r\n[2] Inject pinballspy\Debug\pinballspy.dll into pinball process and then invoke TrapScore API on argument 0x010196BE:\r\n\tpython %s pinball pinballspy\Debug\pinballspy.dll --hijack-primary-thread --function TrapScore $(python -c \"print 0x010196BE\")" %sys.argv[0]
     parser = OptionParser(version=__FULL_VERSION__,
                           usage=usage,
                           )
@@ -302,7 +302,13 @@ if __name__ == "__main__":
     if len(args) < 2:
         print "Error: Insufficient arguments\nUse the --help option to get help"
         sys.exit(1)
-    remote_pid = int(args[0])
+    try:
+        remote_pid = int(args[0])
+    except ValueError:
+        remote_pid = GetProcessIdFromName(args[0])
+        if not remote_pid:
+            print "Error: '%s' doesn't match any process name or ID." %args[0]
+            sys.exit(1)
     dll_path = os.path.abspath(args[1])
     if len(dll_path) > MAX_DLL_PATHLEN:
         print "DLL path too long (must be at most %d characters); please rename" %MAX_DLL_PATHLEN
