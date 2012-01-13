@@ -35,20 +35,35 @@ LPDWORD = c_ulong
 INFINITE = 0xFFFFFFFF
 INVALID_HANDLE_VALUE = 0xFFFFFFFF
 TH32CS_SNAPTHREAD = 0x00000004
+TH32CS_SNAPPROCESS = 0x00000002
+TH32CS_SNAPMODULE = 0x00000008
+TH32CS_SNAPTHREAD = 0x00000004
 CONTEXT_FULL = 0x00010007
 CONTEXT_CONTROL = 0x00010001 
 
 class THREADENTRY32(Structure):
-    _fields_ = [
-        ("dwSize",             DWORD),
-        ("cntUsage",           DWORD),
-        ("th32ThreadID",       DWORD),
-        ("th32OwnerProcessID", DWORD),
-        ("tpBasePri",          DWORD),
-        ("tpDeltaPri",         DWORD),
-        ("dwFlags",            DWORD),
-    ]
+    _fields_ = [("dwSize",             DWORD),
+                ("cntUsage",           DWORD),
+                ("th32ThreadID",       DWORD),
+                ("th32OwnerProcessID", DWORD),
+                ("tpBasePri",          DWORD),
+                ("tpDeltaPri",         DWORD),
+                ("dwFlags",            DWORD),
+                ]
 
+class PROCESSENTRY32(Structure):
+    _fields_ = [( 'dwSize' , c_uint ) , 
+                ( 'cntUsage' , c_uint) ,
+                ( 'th32ProcessID' , c_uint) ,
+                ( 'th32DefaultHeapID' , c_uint) ,
+                ( 'th32ModuleID' , c_uint) ,
+                ( 'cntThreads' , c_uint) ,
+                ( 'th32ParentProcessID' , c_uint) ,
+                ( 'pcPriClassBase' , c_long) ,
+                ( 'dwFlags' , c_uint) ,
+                ( 'szExeFile' , c_char * 260 ) , 
+                ( 'th32MemoryBase' , c_long) ,
+                ( 'th32AccessKey' , c_long ) ]
 
 class FLOATING_SAVE_AREA(Structure):
    _fields_ = [
