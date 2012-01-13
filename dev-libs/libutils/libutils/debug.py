@@ -3,6 +3,7 @@
 from ctypes import *
 from libutils.constants import * 
 import sys
+import os
 
 kernel32 = windll.kernel32
 
@@ -17,6 +18,24 @@ def GetPrimaryThreadId(dwOwnerId):
         break
     return dwMainThreadId
         
+
+def GetProcessIdFromName(szProcName):
+    pe32 = PROCESSENTRY32(0)
+    pe32.dwSize = sizeof(PROCESSENTRY32)
+    # take a snapshot of all running processes
+    hProcSnap = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if hProcSnap == INVALID_HANDLE_VALUE:
+        return
+    # loop over all process structures
+    if kernel32.Process32First(hProcSnap, byref(pe32)):
+        while True:
+            if os.path.basename(szProcName).lower() == pe32.szExeFile.rstrip(".exe").lower(): # filter
+                kernel32.CloseHandle(hProcSnap)
+                return pe32.th32ProcessID
+            if not kernel32.Process32Next(hProcSnap, byref(pe32)):
+                break
+    kernel32.CloseHandle(hProcSnap)
+
 def EnumThreads(dwOwnerId=None):
     """
     Yields a THREADENTRY32 objects generator for threads of the given process
@@ -29,17 +48,14 @@ def EnumThreads(dwOwnerId=None):
     hThreadSnap = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)
     if hThreadSnap == INVALID_HANDLE_VALUE:
         return
-    # retrieve first thread entry; if gabbage then return nil
-    if not kernel32.Thread32First(hThreadSnap, byref(te32)):
-        return
-    if te32.th32OwnerProcessID == dwOwnerId: # we are only interested in threads in dwOwernerId 
-        yield te32 # yield, don't <<return>> !
-    # walk the rest of the thread entries
-    while kernel32.Thread32Next(hThreadSnap, byref(te32)):
-        if te32.th32OwnerProcessID == dwOwnerId: # filter out only those that belong to dwOwnerId
-            yield te32
+    # loop over all thread structures
+    if kernel32.Thread32First(hThreadSnap, byref(te32)):
+        while True:
+            if te32.th32OwnerProcessID == dwOwnerId: # filter out only those that belong to dwOwnerId
+                yield te32
+            if not kernel32.Thread32Next(hThreadSnap, byref(te32)):
+                break
     kernel32.CloseHandle(hThreadSnap) # sanity
-    
 
 if __name__ == '__main__':
     print "[EnumThreads DEMO] Enumerating threads in process .."
