@@ -18,7 +18,6 @@ def GetPrimaryThreadId(dwOwnerId):
         break
     return dwMainThreadId
         
-
 def GetProcessIdFromName(szProcName):
     pe32 = PROCESSENTRY32(0)
     pe32.dwSize = sizeof(PROCESSENTRY32)
