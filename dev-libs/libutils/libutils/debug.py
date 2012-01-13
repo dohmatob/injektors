@@ -5,6 +5,10 @@ from libutils.constants import *
 import sys
 import os
 
+__AUTHOR__ = 'd0hm4t06 3. d0p91m4 (half-jiffie)'
+__VERSION__ = '1.0dev'
+__FULL_VERSION__ = '%s version %s: a module exporting routine facilities like thread/process enumeration, primary-thread obtention\r\n(c) %s' %(os.path.basename(sys.argv[0]),__VERSION__,__AUTHOR__)
+
 kernel32 = windll.kernel32
 
 def GetPrimaryThreadId(dwOwnerId):
@@ -18,7 +22,10 @@ def GetPrimaryThreadId(dwOwnerId):
         break
     return dwMainThreadId
         
-def GetProcessIdFromName(szProcName):
+def EnumProcesses():
+    """
+    Yields a PROCESSENTRY32 objects generator for all running processes
+    """
     pe32 = PROCESSENTRY32(0)
     pe32.dwSize = sizeof(PROCESSENTRY32)
     # take a snapshot of all running processes
@@ -28,19 +35,20 @@ def GetProcessIdFromName(szProcName):
     # loop over all process structures
     if kernel32.Process32First(hProcSnap, byref(pe32)):
         while True:
-            if os.path.basename(szProcName).lower() == pe32.szExeFile.rstrip(".exe").lower(): # filter
-                kernel32.CloseHandle(hProcSnap)
-                return pe32.th32ProcessID
+            yield pe32
             if not kernel32.Process32Next(hProcSnap, byref(pe32)):
                 break
-    kernel32.CloseHandle(hProcSnap)
-
-def EnumThreads(dwOwnerId=None):
+    kernel32.CloseHandle(hProcSnap) # sanity
+    
+def GetProcessIdFromName(szProcName):
+    for pe32 in EnumProcesses():
+        if os.path.basename(szProcName).lower() == pe32.szExeFile.rstrip(".exe").lower(): # filter
+            return pe32.th32ProcessID
+        
+def EnumThreads(dwOwnerId):
     """
     Yields a THREADENTRY32 objects generator for threads of the given process
     """
-    if dwOwnerId is None:
-        dwOwnerId = kernel32.GetCurrentProcessId()
     te32 = THREADENTRY32(0)
     te32.dwSize = sizeof(te32) # this is vital, please!
     # take a snapshot of all running threads
@@ -57,18 +65,55 @@ def EnumThreads(dwOwnerId=None):
     kernel32.CloseHandle(hThreadSnap) # sanity
 
 if __name__ == '__main__':
-    print "[EnumThreads DEMO] Enumerating threads in process .."
-    if len(sys.argv) > 1:
-        te32_generator = EnumThreads(int(sys.argv[1]))
-    else:
-        te32_generator = EnumThreads()
-    dwNbThreads = 0
-    if not te32_generator is None:
-        for te32 in te32_generator:
+    from optparse import OptionParser
+    parser = OptionParser(version=__FULL_VERSION__)
+    parser.add_option('--enumerate-process-threads',
+                      dest='enumerateprocessthreads',
+                      action='store_true',
+                      default=False,
+                      help="""enumerate all threads of a given process""",
+                      )
+    parser.add_option('--get-primary-thread-id',
+                      dest='getprimarythreadid',
+                      action='store_true',
+                      default=False,
+                      help="""get primary thread ID for given process""",
+                      )
+    parser.add_option('--enumerate-all-processes',
+                      dest='enumerateallprocesses',
+                      action='store_true',
+                      default=True,
+                      help="""enumerate all running processes""",
+                      )
+    options, args = parser.parse_args()
+    if options.enumerateallprocesses:
+        print "Enumerating all running processes ..3"
+        dwProcesses = 0
+        for pe32 in EnumProcesses():
+            print "\tPROCESS ID  : %d" %pe32.th32ProcessID
+            print "\tPROCESS NAME: %s" %pe32.szExeFile
+            dwProcesses = dwProcesses + 1
+        print "OK (%d processes)." %dwProcesses
+    if options.enumerateprocessthreads:
+        if not args:
+            print "Error: --enumerate-proess-threads needs the process ID/name as argument"
+            sys.exit(1)
+        try:
+            dwOwnerId = int(args[0])
+        except ValueError:
+            dwOwnerId = GetProcessIdFromName(args[0])
+            if not dwOwnerId:
+                print "Error: no process associated with ID/name: %s" %args[0]
+                sys.exit(1)
+        print "Enumerating threads in process (process ID = %d) .." %dwOwnerId
+        dwNbThreads = 0
+        for te32 in EnumThreads(dwOwnerId):
             dwNbThreads += 1
-            print "\tTHREAD ID     = %d" %te32.th32ThreadID
-            print "\tBASE PRIORITY = %d" %te32.tpBasePri
-    
-    print "[EnumThreads DEMO] Total thread count = %d" %dwNbThreads
+            print "\tTHREAD ID    : %d" %te32.th32ThreadID
+            print "\tBase Priority: %d" %te32.tpBasePri
+            print "OK (Total thread count = %d)." %dwNbThreads
+        if dwNbThreads and options.getprimarythreadid:
+            print "PRIMARY THREAD ID: %d" %GetPrimaryThreadId(dwOwnerId)
+            
 
 
