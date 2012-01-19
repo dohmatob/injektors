@@ -62,7 +62,7 @@ def hack(target_pid,
     codecave_addr = windll.kernel32.VirtualAllocEx(target_process_handle,
                                                    0,
                                                    CODECAVE_SIZE,
-                                                   MEM_COMMIT | MEM_RESERVE,
+                                                   MEM_COMMIT,
                                                    PAGE_EXECUTE_READWRITE,
                                                    )
     if not codecave_addr: # error-check
@@ -127,8 +127,8 @@ def hack(target_pid,
                                                                                )
         end_of_seh = freelibraryandexitthread_EP
     else: 
-        prolog = codecave_addr + CODECAVE_SIZE - 1 - 1 - 1
-        freelibrary_EP = prolog - FREELIBRARYSHELLCODE_LEN - UNCONDITIONALJMPSHELLCODE_LEN
+        prolog = codecave_addr + CODECAVE_SIZE - 1 - 1 - 1 
+        freelibrary_EP = prolog - FREELIBRARYSHELLCODE_LEN - UNCONDITIONALJMPSHELLCODE_LEN 
         freelibrary_shellcode = FreeLibraryShellcode(dll_addr,
                                                     start_offset=freelibrary_EP,
                                                     pseudo="unload %s" %dll_name,

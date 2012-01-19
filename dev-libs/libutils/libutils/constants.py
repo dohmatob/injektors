@@ -2,7 +2,44 @@
 # (c) half-jiffie (dohmatob elvis dopgima)
 
 from ctypes import *
- 
+
+# Fundamental win32api data types
+BYTE = c_ubyte
+PVOID = c_void_p
+HANDLE   = c_void_p
+LPVOID = c_void_p
+DWORD = c_void_p
+LPDWORD = c_ulong
+
+# Memory info
+class SYSTEM_INFO_UNION(Union):
+    _fields_ = [("dwOemId",    DWORD),
+                ("sProcStruc", PROC_STRUCT),
+]
+
+class MEMORY_BASIC_INFORMATION(Structure):
+    _fields_ = [("BaseAddress", PVOID),
+                ("AllocationBase", PVOID),
+                ("AllocationProtect", DWORD),
+                ("RegionSize", SIZE_T),
+                ("State", DWORD),
+                ("Protect", DWORD),
+                ("Type", DWORD),
+                ]
+    
+class SYSTEM_INFO(Structure):
+    _fields_ = [("uSysInfo", SYSTEM_INFO_UNION),
+                ("dwPageSize", DWORD),
+                ("lpMinimumApplicationAddress", LPVOID),
+                ("lpMaximumApplicationAddress", LPVOID),
+                ("dwActiveProcessorMask", DWORD),
+                ("dwNumberOfProcessors", DWORD),
+                ("dwProcessorType", DWORD),
+                ("dwAllocationGranularity", DWORD),
+                ("wProcessorLevel", WORD),
+                ("wProcessorRevision", WORD),
+]
+    
 # Memory permissions
 PAGE_READWRITE = 0x04
 PAGE_EXECUTE_READWRITE = 0x40
@@ -22,14 +59,6 @@ THREAD_QUERY_INFORMATION = 0x00000040
 MB_OK = 0x00
 MB_ICONINFORMATION = 0x40
 MB_ICONERROR = 0x10
-
-# Fundamental win32api data types
-BYTE = c_ubyte
-PVOID = c_void_p
-HANDLE   = c_void_p
-LPVOID = c_void_p
-DWORD = c_void_p
-LPDWORD = c_ulong
 
 # Debugging
 INFINITE = 0xFFFFFFFF
@@ -78,7 +107,6 @@ class FLOATING_SAVE_AREA(Structure):
         ("RegisterArea", BYTE * 80),
         ("Cr0NpxState", DWORD),
 ]
-
 
 class CONTEXT(Structure):
     _fields_ = [    
