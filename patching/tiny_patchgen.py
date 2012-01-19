@@ -5,8 +5,8 @@ import sys
 import os
 import time
 
-__author__ = 'd0hm4t06 3. d0p91m4 (RUDEBOI)'
-__version__ = '1.0'
+__author__ = 'd0hm4t06 3. d0p91m4 (h4lf-jiffie)'
+__version__ = '1.0dev'
 __full_version__ = '%s version %s: a tiny command-line binary patch generator of IDA-like difs\r\n(c) %s' %(os.path.basename(sys.argv[0]),__version__,__author__)
 
 def pretty_time():
