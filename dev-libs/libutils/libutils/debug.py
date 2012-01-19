@@ -10,7 +10,8 @@ import os
 
 __AUTHOR__ = 'd0hm4t06 3. d0p91m4 (half-jiffie)'
 __VERSION__ = '1.0dev'
-__FULL_VERSION__ = '%s version %s: a module exporting routine facilities like thread/process enumeration, primary-thread obtention\r\n(c) %s' %(os.path.basename(sys.argv[0]),__VERSION__,__AUTHOR__)
+__FULL_VERSION__ = '%s version %s: a module exporting routine facilities like thread/process enumeration, primary-thread \
+obtention\r\n(c) %s' %(os.path.basename(sys.argv[0]),__VERSION__,__AUTHOR__)
 
 kernel32 = windll.kernel32
 
@@ -94,7 +95,9 @@ if __name__ == '__main__':
         dwProcesses = 0
         for pe32 in EnumProcesses():
             print "\tPROCESS ID  : %d" %pe32.th32ProcessID
+            print "\tPARENT ID   : %d" %pe32.th32ParentProcessID
             print "\tPROCESS NAME: %s" %pe32.szExeFile
+            print "\tTHREAD COUNT: %d" %pe32.cntThreads
             dwProcesses = dwProcesses + 1
         print "OK (%d processes)." %dwProcesses
     if options.enumerateprocessthreads:
