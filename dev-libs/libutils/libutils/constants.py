@@ -8,10 +8,18 @@ BYTE = c_ubyte
 PVOID = c_void_p
 HANDLE   = c_void_p
 LPVOID = c_void_p
-DWORD = c_void_p
+WORD = c_ushort
+DWORD = c_ulong # c_void_p
+SIZE_T = c_ulong
 LPDWORD = c_ulong
 
-# Memory info
+# Memory-related structures
+class PROC_STRUCT(Structure):
+    _fields_ = [
+        ("wProcessorArchitecture",    WORD),
+        ("wReserved",                 WORD),
+]
+
 class SYSTEM_INFO_UNION(Union):
     _fields_ = [("dwOemId",    DWORD),
                 ("sProcStruc", PROC_STRUCT),
@@ -40,12 +48,17 @@ class SYSTEM_INFO(Structure):
                 ("wProcessorRevision", WORD),
 ]
     
-# Memory permissions
+# Memory-permission-related structures
 PAGE_READWRITE = 0x04
+PAGE_EXECUTE_READ = 0x20
+PAGE_READONLY = 0x02
+PAGE_GUARD = 0x100
+PAGE_NOACCESS = 0x01
 PAGE_EXECUTE_READWRITE = 0x40
 MEM_COMMIT = 0x1000
 MEM_RESERVE = 0x2000
 MEM_RELEASE = 0x8000
+MEM_IMAGE = 0x1000000
 
 # Process/thread access
 PROCESS_ALL_ACCESS = 0x1F0FFF
