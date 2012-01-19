@@ -7,6 +7,10 @@ from ctypes import *
 from libutils.constants import * 
 import sys
 import os
+import re
+import struct
+import pefile
+from codecs import escape_decode
 
 __AUTHOR__ = 'd0hm4t06 3. d0p91m4 (half-jiffie)'
 __VERSION__ = '1.0dev'
@@ -68,6 +72,116 @@ def EnumThreads(dwOwnerId):
                 break
     kernel32.CloseHandle(hThreadSnap) # sanity
 
+def FindSignatureInProcessMemory(hProcess, 
+                                 pSignature, # sought-for signature, a character-string/buffer
+                                 BadMbiFilter=None,
+                                 ):
+    """
+    Passively scrapes a given process's memory, looking for specified signature (string of bytes)
+    """
+    mbi = MEMORY_BASIC_INFORMATION()
+    si = SYSTEM_INFO(SYSTEM_INFO_UNION(0))
+    dwOldProtection = DWORD(0)
+    windll.kernel32.GetSystemInfo(byref(si))
+    dwSignature = len(pSignature)
+    pBytesRead = create_string_buffer(si.dwPageSize) # create a character-buffer as large as a system page
+    dwBytesRead = DWORD(0)
+    def SkipMbi(mbi):
+        """
+        Filters memory regions to be skipped
+        """
+        flag = (mbi.State != MEM_COMMIT) # XXX TODO: filter over mbi.Type and mbi.Protect too
+        if not BadMbiFilter is None:
+            flag = flag or BadMbiFilter(mbi)
+        return flag
+    """
+    scrape process's address space
+    """
+    dwRegionOffset = si.lpMinimumApplicationAddress 
+    while dwRegionOffset < si.lpMaximumApplicationAddress:
+        windll.kernel32.VirtualQueryEx(hProcess,
+                                       dwRegionOffset,
+                                       byref(mbi),
+                                       sizeof(MEMORY_BASIC_INFORMATION),
+                                       )
+        region_OK = (mbi.State == MEM_COMMIT) 
+        if SkipMbi(mbi):
+            dwRegionOffset = dwRegionOffset + mbi.RegionSize 
+            continue # barren; move-on to next region
+        """
+        scrape current memory region in si.dwPageSize-byte blocks. XXX my assumption is that regions are always 
+        multiples of the system page size --No?
+        """
+        for dwBlockOffset in xrange(dwRegionOffset, dwRegionOffset + mbi.RegionSize, si.dwPageSize):
+            if not windll.kernel32.VirtualProtectEx(hProcess,
+                                                    dwBlockOffset,
+                                                    si.dwPageSize,
+                                                    PAGE_READWRITE,
+                                                    byref(dwOldProtection),
+                                                    ):
+                continue # barren; move-on to next block
+            read_OK = windll.kernel32.ReadProcessMemory(hProcess,
+                                                        dwBlockOffset,
+                                                        pBytesRead,
+                                                        si.dwPageSize,
+                                                        byref(dwBytesRead),
+                                                        )
+            read_OK = read_OK and (dwBytesRead.value == si.dwPageSize)
+            if not read_OK:
+                windll.kernel32.VirtualProtectEx(hProcess,
+                                                 dwBlockOffset,
+                                                 si.dwPageSize,
+                                                 dwOldProtection,
+                                                 byref(dwOldProtection),
+                                                 )
+                continue # barren; move-on to next block
+            windll.kernel32.VirtualProtectEx(hProcess,
+                                             dwBlockOffset,
+                                             si.dwPageSize,
+                                             dwOldProtection,
+                                             byref(dwOldProtection),
+                                             ) # restore protections
+            """
+            scrape character-buffer for all occurences of sought-for signature
+            """
+            for item in re.finditer(pSignature, pBytesRead):
+                yield item.start() + dwBlockOffset # new result
+        dwRegionOffset = dwRegionOffset + mbi.RegionSize # move-on to next block
+    windll.kernel32.CloseHandle(hProcess) # sanity
+
+def FindDwordInProcessMemory(hProcess, 
+                             dwValue,
+                             ):
+    """
+    Finds a DWORD value (e.g. a game score, etc.) in a process's memory
+    """
+    def DonnotSearchHere(mbi):
+        return mbi.Protect in [PAGE_GUARD, # certainly barren
+                               PAGE_EXECUTE_READ, # the value must be written by somebody, somehow
+                               PAGE_NOACCESS, # certainly barren
+                               PAGE_READONLY, # the value must be written by somebody, somehow
+                               ]
+    pSignature = struct.pack('<i', # XXX windows uses little-endian (No?)
+                             dwValue,
+                             )
+    return FindSignatureInProcessMemory(hProcess,
+                                        pSignature,
+                                        BadMbiFilter=DonnotSearchHere,
+                                        )
+
+def FindSignatureInBinaryFile(filename,
+                              byte_seq,
+                              ):
+    """
+    Passively scrapes a specified program (PE binary file), looking for a specified signature (string of bytes)
+    """
+    byte_seq = escape_decode(byte_seq)[0]
+    pe_obj = pefile.PE(filename) 
+    for item in re.finditer(byte_seq,
+                            pe_obj.get_memory_mapped_image(), 
+                            ): 
+        yield item.start() + pe_obj.OPTIONAL_HEADER.ImageBase
+                    
 if __name__ == '__main__':
     from optparse import OptionParser
     parser = OptionParser(version=__FULL_VERSION__)
@@ -119,7 +233,6 @@ if __name__ == '__main__':
             print "\tBase Priority: %d" %te32.tpBasePri
             print "OK (Total thread count = %d)." %dwNbThreads
         if dwNbThreads and options.getprimarythreadid:
-            print "PRIMARY THREAD ID: %d" %GetPrimaryThreadId(dwOwnerId)
-            
+            print "PRIMARY THREAD ID: %d" %GetPrimaryThreadId(dwOwnerId)            
 
 
