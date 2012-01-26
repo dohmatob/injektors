@@ -1,13 +1,88 @@
-+++++++++++++++++++++++++++++++++++++
-+ HERE BE CODE FOR DLLI AND THE ILK +
-+++++++++++++++++++++++++++++++++++++
+++++++++++
++ README +
+++++++++++
 
-(c) half-jiffie (dohmatob elvis dopgima)
+(c) h4lf-jiffie (dohmatob elvis dopgima)
 
+injecktors is a tiny python command-line framework doing such business like: dll/code injection (win32 only), run-time 
+and static memory patching, sql injection, etc.
 
-See a scenario below ..
+For the moment, it only implements dll/code injection.
 
-PS C:\Users\rude-boi\CODE\security> python .\injection\dll_injection pinball 'C:\Users\rude-boi\Documents\Visual Studio
+It is structured as follows:
+
+├───dev-libs <-- helper packages/libraries
+│   ├───libdebug <-- herebe implemented APIs for debugging and stuff (see corresponding README file)
+│   │   └───libdebug 
+│   └───libpayload <-- here be implemented APIs for shellcode generation (see corresponding README file)
+│       └───libpayload
+├───injection <-- herebe scripts that perform the injection proper (see corresponding README file)
+│   └───dll_injection
+└───patching <-- herebe scripts for memory search, patching, etc. (see corresponding README file)
+
++++++++++++++++
++ Dependences +
++++++++++++++++
+
+Be sure to install the following python dependencies:
+1]- pefile-1.2.10-114 (http://code.google.com/p/pefile/downloads/list)
+
+++++++++++++++++
++ INSTALLATION +
+++++++++++++++++
+
+Quite simple ..
+
+step 1]- build and install the libdebug package by running the following 'python setup.py install' command:
+[snip]
+PS C:\Users\rude-boi\CODE\injektors> cd .\dev-libs\libdebug
+PS C:\Users\rude-boi\CODE\injektors\dev-libs\libdebug> python setup.p
+running install
+running build
+running build_py
+creating build
+creating build\lib
+creating build\lib\libdebug
+copying libdebug\constants.py -> build\lib\libdebug
+copying libdebug\debug.py -> build\lib\libdebug
+copying libdebug\injector.py -> build\lib\libdebug
+copying libdebug\__init__.py -> build\lib\libdebug
+running install_lib
+running install_egg_info
+Removing C:\python27\Lib\site-packages\libdebug-0.1dev-py2.7.egg-info
+Writing C:\python27\Lib\site-packages\libdebug-0.1dev-py2.7.egg-info
+PS C:\Users\rude-boi\CODE\injektors\dev-libs\libdebug>
+[snip]
+
+step 2]- build and install the libpayload package by running the following 'python setup.py install' command:
+[snip]
+PS C:\Users\rude-boi\CODE\injektors\dev-libs\libdebug> cd ..\libpayload
+PS C:\Users\rude-boi\CODE\injektors\dev-libs\libpayload> python setup.py install
+running install
+running build
+running build_py
+creating build
+creating build\lib
+creating build\lib\libpayload
+copying libpayload\payload.py -> build\lib\libpayload
+copying libpayload\__init__.py -> build\lib\libpayload
+running install_lib
+running install_egg_info
+Removing C:\python27\Lib\site-packages\libpayload-0.1dev-py2.7.egg-info
+Writing C:\python27\Lib\site-packages\libpayload-0.1dev-py2.7.egg-info
+PS C:\Users\rude-boi\CODE\injektors\dev-libs\libpayload>
+PS C:\Users\rude-boi\CODE\injektors\dev-libs\libpayload> cd ../..
+[snip]
+
++++++++++++
++ USAGE ? +
++++++++++++
+
+N.B.:- This is just a stub --for now!
+
+See a usage-scenario below ..
+
+PS C:\Users\rude-boi\CODE\injektors> python .\injection\dll_injection pinball 'C:\Users\rude-boi\Documents\Visual Studio
 2010\Projects\pinballspy\Debug\pinballspy.dll' --function TrapScore --hijack-primary-thread
 C:\python27\python.exe: can't find '__main__' module in '.\\injection\\dll_injection'
 PS C:\Users\rude-boi\CODE\security> python .\injection\dll_injection\generic_loader.py pinball 'C:\Users\rude-boi\Docume
