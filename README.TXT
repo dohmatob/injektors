@@ -7,6 +7,9 @@
 ++++++++++++++++
 + INSTALLATION +
 ++++++++++++++++
+
+Quite simple ..
+
 step 1]- build and install the libdebug package by running the following 'python setup.py install' command:
 PS C:\Users\rude-boi\CODE\injektors> cd .\dev-libs\libdebug
 PS C:\Users\rude-boi\CODE\injektors\dev-libs\libdebug> python setup.p
