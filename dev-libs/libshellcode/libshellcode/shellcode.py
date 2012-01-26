@@ -147,6 +147,10 @@ class Shellcode:
         self.addAsmInstruction(asm)
         return asm.getOffset()
 
+    def addEgg(self, egg):
+        self._egg += shellcode.getEgg()
+        self._current_offset += len(egg)
+        
     def addShellcode(self, shellcode):
         if shellcode.getPseudo():
             self._block_entry_tags[self._current_offset] = shellcode.getPseudo()

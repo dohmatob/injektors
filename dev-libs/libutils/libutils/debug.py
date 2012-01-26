@@ -10,7 +10,6 @@ import os
 import re
 import struct
 import pefile
-from codecs import escape_decode
 
 __AUTHOR__ = 'd0hm4t06 3. d0p91m4 (half-jiffie)'
 __VERSION__ = '1.0dev'
@@ -74,11 +73,13 @@ def EnumThreads(dwOwnerId):
 
 def FindSignatureInProcessMemory(hProcess, 
                                  pSignature, # sought-for signature, a character-string/buffer
-                                 BadMbiFilter=None,
+                                 BadMbiFilter=None, # a explicitly-specified filter for barren (not worth scraping) MBIs
                                  ):
     """
     Passively scrapes a given process's memory, looking for specified signature (string of bytes)
     """
+    if not hProcess:
+        return # XXX This is not enough; raise exception or something similar
     mbi = MEMORY_BASIC_INFORMATION()
     si = SYSTEM_INFO(SYSTEM_INFO_UNION(0))
     dwOldProtection = DWORD(0)
@@ -86,14 +87,16 @@ def FindSignatureInProcessMemory(hProcess,
     dwSignature = len(pSignature)
     pBytesRead = create_string_buffer(si.dwPageSize) # create a character-buffer as large as a system page
     dwBytesRead = DWORD(0)
+    pattern = re.compile(re.escape(pSignature))
     def SkipMbi(mbi):
         """
         Filters memory regions to be skipped
         """
-        flag = (mbi.State != MEM_COMMIT) # XXX TODO: filter over mbi.Type and mbi.Protect too
+        criterion = (mbi.State != MEM_COMMIT) # bring-in state criterion
+        # criterion = criterion or ((mbi.Type != MEM_MAPPED) and (mbi.Type != MEM_IMAGE)) # bring-in type criterion
         if not BadMbiFilter is None:
-            flag = flag or BadMbiFilter(mbi)
-        return flag
+            criterion = criterion or BadMbiFilter(mbi)
+        return criterion
     """
     scrape process's address space
     """
@@ -104,7 +107,6 @@ def FindSignatureInProcessMemory(hProcess,
                                        byref(mbi),
                                        sizeof(MEMORY_BASIC_INFORMATION),
                                        )
-        region_OK = (mbi.State == MEM_COMMIT) 
         if SkipMbi(mbi):
             dwRegionOffset = dwRegionOffset + mbi.RegionSize 
             continue # barren; move-on to next region
@@ -126,26 +128,20 @@ def FindSignatureInProcessMemory(hProcess,
                                                         si.dwPageSize,
                                                         byref(dwBytesRead),
                                                         )
-            read_OK = read_OK and (dwBytesRead.value == si.dwPageSize)
-            if not read_OK:
-                windll.kernel32.VirtualProtectEx(hProcess,
-                                                 dwBlockOffset,
-                                                 si.dwPageSize,
-                                                 dwOldProtection,
-                                                 byref(dwOldProtection),
-                                                 )
-                continue # barren; move-on to next block
             windll.kernel32.VirtualProtectEx(hProcess,
                                              dwBlockOffset,
                                              si.dwPageSize,
                                              dwOldProtection,
                                              byref(dwOldProtection),
                                              ) # restore protections
+            read_OK = read_OK and (dwBytesRead.value == si.dwPageSize)
+            if not read_OK:
+                continue # barren; move-on to next block
             """
             scrape character-buffer for all occurences of sought-for signature
             """
-            for item in re.finditer(pSignature, pBytesRead):
-                yield item.start() + dwBlockOffset # new result
+            for item in pattern.finditer(pBytesRead):
+                yield item.start() + dwBlockOffset
         dwRegionOffset = dwRegionOffset + mbi.RegionSize # move-on to next block
     windll.kernel32.CloseHandle(hProcess) # sanity
 
@@ -159,7 +155,7 @@ def FindDwordInProcessMemory(hProcess,
         return mbi.Protect in [PAGE_GUARD, # certainly barren
                                PAGE_EXECUTE_READ, # the value must be written by somebody, somehow
                                PAGE_NOACCESS, # certainly barren
-                               PAGE_READONLY, # the value must be written by somebody, somehow
+                               PAGE_READONLY, # the value muorst be written by somebody, somehow
                                ]
     pSignature = struct.pack('<i', # XXX windows uses little-endian (No?)
                              dwValue,
@@ -175,7 +171,6 @@ def FindSignatureInBinaryFile(filename,
     """
     Passively scrapes a specified program (PE binary file), looking for a specified signature (string of bytes)
     """
-    byte_seq = escape_decode(byte_seq)[0]
     pe_obj = pefile.PE(filename) 
     for item in re.finditer(byte_seq,
                             pe_obj.get_memory_mapped_image(), 
