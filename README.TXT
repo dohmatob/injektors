@@ -2,10 +2,55 @@
 + HERE BE CODE FOR DLLI AND THE ILK +
 +++++++++++++++++++++++++++++++++++++
 
-(c) half-jiffie (dohmatob elvis dopgima)
+(c) h4lf-jiffie (dohmatob elvis dopgima)
 
+++++++++++++++++
++ INSTALLATION +
+++++++++++++++++
+step 1]- build and install the libdebug package by running the following 'python setup.py install' command:
+PS C:\Users\rude-boi\CODE\injektors> cd .\dev-libs\libdebug
+PS C:\Users\rude-boi\CODE\injektors\dev-libs\libdebug> python setup.p
+running install
+running build
+running build_py
+creating build
+creating build\lib
+creating build\lib\libdebug
+copying libdebug\constants.py -> build\lib\libdebug
+copying libdebug\debug.py -> build\lib\libdebug
+copying libdebug\injector.py -> build\lib\libdebug
+copying libdebug\__init__.py -> build\lib\libdebug
+running install_lib
+running install_egg_info
+Removing C:\python27\Lib\site-packages\libdebug-0.1dev-py2.7.egg-info
+Writing C:\python27\Lib\site-packages\libdebug-0.1dev-py2.7.egg-info
+PS C:\Users\rude-boi\CODE\injektors\dev-libs\libdebug>
 
-See a scenario below ..
+step 2]- build and install the libpayload package by running the following 'python setup.py install' command:
+PS C:\Users\rude-boi\CODE\injektors\dev-libs\libdebug> cd ..\libpayload
+PS C:\Users\rude-boi\CODE\injektors\dev-libs\libpayload> python setup.py install
+running install
+running build
+running build_py
+creating build
+creating build\lib
+creating build\lib\libpayload
+copying libpayload\payload.py -> build\lib\libpayload
+copying libpayload\__init__.py -> build\lib\libpayload
+running install_lib
+running install_egg_info
+Removing C:\python27\Lib\site-packages\libpayload-0.1dev-py2.7.egg-info
+Writing C:\python27\Lib\site-packages\libpayload-0.1dev-py2.7.egg-info
+PS C:\Users\rude-boi\CODE\injektors\dev-libs\libpayload>
+PS C:\Users\rude-boi\CODE\injektors\dev-libs\libpayload> cd ../..
+   
++++++++++++
++ USAGE ? +
++++++++++++
+
+N.B.:- This is just a stub --for now!
+
+See a usage-scenario below ..
 
 PS C:\Users\rude-boi\CODE\injektors> python .\injection\dll_injection pinball 'C:\Users\rude-boi\Documents\Visual Studio
 2010\Projects\pinballspy\Debug\pinballspy.dll' --function TrapScore --hijack-primary-thread
