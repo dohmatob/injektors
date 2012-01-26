@@ -7,7 +7,7 @@
 
 See a scenario below ..
 
-PS C:\Users\rude-boi\CODE\security> python .\injection\dll_injection pinball 'C:\Users\rude-boi\Documents\Visual Studio
+PS C:\Users\rude-boi\CODE\injektors> python .\injection\dll_injection pinball 'C:\Users\rude-boi\Documents\Visual Studio
 2010\Projects\pinballspy\Debug\pinballspy.dll' --function TrapScore --hijack-primary-thread
 C:\python27\python.exe: can't find '__main__' module in '.\\injection\\dll_injection'
 PS C:\Users\rude-boi\CODE\security> python .\injection\dll_injection\generic_loader.py pinball 'C:\Users\rude-boi\Docume
