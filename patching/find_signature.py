@@ -77,7 +77,7 @@ def EliminateFakeAddresses(pid,
 if __name__ == '__main__':
     usage = "python %s [OPTIONS] <input_binary_file_or_process_name_or_PID> <signature_to_find>" %sys.argv[0]
     usage += "\r\n\r\nExamples:\r\n"
-    usage += r"[1] python %s C:\\Users\\rude-boi\\Desktop\\Pinball.exe \x01\x30\x8B\x10\x81\xFA\x00\xCA\x9A\x3B" \
+    usage += r"[1] python %s C:\\Users\\rude-boi\\Desktop\\Pinball.exe 01308B1081FA00CA9A3B" \
         %(sys.argv[0])
     usage += "\r\nwill attempt to find the stub"
     usage += "\r\n"
@@ -89,10 +89,10 @@ if __name__ == '__main__':
     |<-
     """
     usage += "\r\nin the binary C:\\Users\\rude-boi\\Desktop\\Pinball.exe !\r\n\r\n"
-    usage += r"[2] python %s pinball \x01\x30\x8B\x10\x81\xFA\xA0\x86\x01\x00" %(sys.argv[0])
+    usage += r"[2] python %s pinball 01308B1081FAA0860100" %(sys.argv[0])
     usage += "\r\n\r\nsame as above, but the search will be done in the pinball process's memory \
 (a pinball session should be running, of course!)\r\n\r\n"
-    usage += r"[3] python %s C:\\Users\\rude-boi\\Desktop\\Pinball.exe $(python -c \"print '\\x00'*20\")" %sys.argv[0]
+    usage += r"[3] python %s C:\\Users\\rude-boi\\Desktop\\Pinball.exe $(python -c \"print '00'*20\")" %sys.argv[0]
     usage += "\r\nwill attempt to find a codecave (a contiguous block of zero-bytes) of size 200 in \
 C:\\Users\\rude-boi\\Desktop\\Pinball.exe"
     parser = OptionParser(usage=usage,
