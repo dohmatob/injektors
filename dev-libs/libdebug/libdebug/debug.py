@@ -4,7 +4,7 @@ This module implements handy win32 FFIs (Foreign-Function Interfaces) for stuff 
 (c) half-jiffie (dohmatob elvis dopgima)
 """
 from ctypes import *
-from libutils.constants import * 
+from constants import * 
 import sys
 import os
 import re

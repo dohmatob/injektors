@@ -1,9 +1,9 @@
 from distutils.core import setup
 
 setup(
-    name='libshellcode',
+    name='libdebug',
     version='0.1dev',
-    packages =[ 'libshellcode',],
+    packages =[ 'libdebug',],
     license='GPL',
     long_description=open('README').read(),
     )

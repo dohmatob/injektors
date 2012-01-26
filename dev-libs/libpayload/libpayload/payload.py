@@ -4,18 +4,18 @@
 import struct
 import unittest
 from ctypes import windll, byref
-from libutils.constants import *
+from libdebug.constants import *
 
 # exported constants
-CMPEAXSHELLCODE_LEN = 5
-MESSAGEBOXSHELLCODE_LEN = 21
-EXITTHREADSHELLCODE_LEN = 9
-LOADLIBRARYSHELLCODE_LEN = 12
-FREELIBRARYSHELLCODE_LEN = 13
-FREELIBRARYANDEXITTHREADSHELLCODE_LEN = 15
-GETPROCADDRESSSHELLCODE_LEN = 18
-UNCONDITIONALJMPSHELLCODE_LEN = 5
-CONDITIONALJMPSHELLCODE_LEN = 6
+CMPEAXPAYLOAD_LEN = 5
+MESSAGEBOXPAYLOAD_LEN = 21
+EXITTHREADPAYLOAD_LEN = 9
+LOADLIBRARYPAYLOAD_LEN = 12
+FREELIBRARYPAYLOAD_LEN = 13
+FREELIBRARYANDEXITTHREADPAYLOAD_LEN = 15
+GETPROCADDRESSPAYLOAD_LEN = 18
+UNCONDITIONALJMPPAYLOAD_LEN = 5
+CONDITIONALJMPPAYLOAD_LEN = 6
 
 # position-independent (unrebased) APIs
 kernel32 = windll.kernel32
@@ -80,22 +80,22 @@ class AsmInstruction:
         return self._size
 
 
-class Shellcode:
+class Payload:
     """
-    Model for shellcode: encapsulates payload + other control attributes + methods for manipulation.
+    Model for payload: encapsulates payload + other control attributes + methods for manipulation.
     Fundamental assembly instructions like CALL EAX, POP EDX, MOVSB, etc., are implemented, thus 
     providing a powerway of building arbitrarily complex payloads incrementally; all you need to 
     remember are the mnemonics; we take care of the opcodes --back end.
     """
     def __init__(self,
-                 start_offset=0, # an 'artificial' offset where the shellcode starts
-                 pseudo=None, # a pseudo for the shellcode (could be a string like <unload dll and exit remote thread>
+                 start_offset=0, # an 'artificial' offset where the payload starts
+                 pseudo=None, # a pseudo for the payload (could be a string like <unload dll and exit remote thread>
                  ):
         self._start_offset = start_offset
         self._current_offset = start_offset
         self._pseudo = pseudo
-        self._egg = "" # payload (opcodes) contained by shellcode
-        self._asm_instructions = dict() # a dictionary of assembly instructions that make up the shellcode
+        self._egg = "" # payload (opcodes) contained by payload
+        self._asm_instructions = dict() # a dictionary of assembly instructions that make up the payload
         self._offsets = list()
         self._block_entry_tags = dict()
         self._block_exit_tags = dict()
@@ -148,22 +148,22 @@ class Shellcode:
         return asm.getOffset()
 
     def addEgg(self, egg):
-        self._egg += shellcode.getEgg()
+        self._egg += payload.getEgg()
         self._current_offset += len(egg)
         
-    def addShellcode(self, shellcode):
-        if shellcode.getPseudo():
-            self._block_entry_tags[self._current_offset] = shellcode.getPseudo()
-        self._egg += shellcode.getEgg()
-        self._offsets += shellcode.getOffsets()
-        for offset in shellcode.getOffsets():
-            self._asm_instructions[offset] = shellcode.getAsmInstructions()[offset]
-        self._current_offset += shellcode.getSize()
-        if shellcode.getPseudo():
-            self._block_exit_tags[self._current_offset] = shellcode.getPseudo()
-        for offset, tag in shellcode.getBlockEntryTags().iteritems():
+    def addPayload(self, payload):
+        if payload.getPseudo():
+            self._block_entry_tags[self._current_offset] = payload.getPseudo()
+        self._egg += payload.getEgg()
+        self._offsets += payload.getOffsets()
+        for offset in payload.getOffsets():
+            self._asm_instructions[offset] = payload.getAsmInstructions()[offset]
+        self._current_offset += payload.getSize()
+        if payload.getPseudo():
+            self._block_exit_tags[self._current_offset] = payload.getPseudo()
+        for offset, tag in payload.getBlockEntryTags().iteritems():
             self._block_entry_tags[offset] = tag
-        for offset, tag in shellcode.getBlockExitTags().iteritems():
+        for offset, tag in payload.getBlockExitTags().iteritems():
             self._block_exit_tags[offset] = tag
 
     def getBlockEntryTags(self):
@@ -220,7 +220,7 @@ class Shellcode:
         self._block_exit_tags[self._current_offset] = 'INT3-sled'
                             
     def jnz(self, addr):
-        opcodes = "\x0F\x85" + struct.pack("<I", addr - self._current_offset - CONDITIONALJMPSHELLCODE_LEN)
+        opcodes = "\x0F\x85" + struct.pack("<I", addr - self._current_offset - CONDITIONALJMPPAYLOAD_LEN)
         mnemonic = 'JNZ 0x%0X' %addr
         asm = AsmInstruction(opcodes,
                              mnemonic,
@@ -229,7 +229,7 @@ class Shellcode:
         self.addAsmInstruction(asm)
 
     def jz(self, addr):
-        opcodes = "\x0F\x84" + struct.pack("<I", addr - self._current_offset - CONDITIONALJMPSHELLCODE_LEN)
+        opcodes = "\x0F\x84" + struct.pack("<I", addr - self._current_offset - CONDITIONALJMPPAYLOAD_LEN)
         mnemonic = 'JZ 0x%0X' %addr
         asm = AsmInstruction(opcodes,
                              mnemonic,
@@ -239,7 +239,7 @@ class Shellcode:
 
 
     def jmp(self, addr):
-        opcodes = "\xE9" + struct.pack("<I", addr - self._current_offset - UNCONDITIONALJMPSHELLCODE_LEN)
+        opcodes = "\xE9" + struct.pack("<I", addr - self._current_offset - UNCONDITIONALJMPPAYLOAD_LEN)
         mnemonic = 'JMP 0x%0X' %addr
         asm = AsmInstruction(opcodes,
                              mnemonic,
@@ -361,14 +361,14 @@ class Shellcode:
         self.addAsmInstruction(asm)
 
 
-class SleepExShellcode(Shellcode):
+class SleepExPayload(Payload):
     def __init__(self,
                  nb_milliseconds=INFINITE,
                  alertable=1,
                  start_offset=0,
                  pseudo='invoke SleepEx',
                  ):
-        Shellcode.__init__(self, 
+        Payload.__init__(self, 
                            start_offset=start_offset,
                            pseudo=pseudo,
                            )
@@ -377,7 +377,7 @@ class SleepExShellcode(Shellcode):
         self.call(WINAPI["SleepEx"])
 
     
-class ExitThreadShellcode(Shellcode):
+class ExitThreadPayload(Payload):
     """
     instantiates an egg like:
     ...
@@ -390,7 +390,7 @@ class ExitThreadShellcode(Shellcode):
                  start_offset=0,
                  pseudo='invoke ExitThread',
                  ):
-        Shellcode.__init__(self, 
+        Payload.__init__(self, 
                            start_offset=start_offset,
                            pseudo=pseudo,
                            )
@@ -398,13 +398,13 @@ class ExitThreadShellcode(Shellcode):
         self.call(WINAPI["ExitThread"])
 
 
-class FreeLibraryAndExitThreadShellcode(Shellcode):
+class FreeLibraryAndExitThreadPayload(Payload):
     def __init__(self,
                  dll_addr,
                  start_offset=0,
                  pseudo='invoke FreeLibraryAndExitThread',
                  ):
-        Shellcode.__init__(self,
+        Payload.__init__(self,
                            start_offset=start_offset,
                            pseudo=pseudo,
                            )
@@ -414,13 +414,13 @@ class FreeLibraryAndExitThreadShellcode(Shellcode):
         self.call(WINAPI["FreeLibraryAndExitThread"])
 
 
-class LoadLibraryShellcode(Shellcode):
+class LoadLibraryPayload(Payload):
     def __init__(self,
                  dll_addr,
                  start_offset=0,
                  pseudo='invoke LoadLibraryA',
                  ):
-        Shellcode.__init__(self,
+        Payload.__init__(self,
                            start_offset=start_offset,
                            pseudo=pseudo,
                            )
@@ -429,7 +429,7 @@ class LoadLibraryShellcode(Shellcode):
         self.call(WINAPI['LoadLibraryA'])
 
 
-class FreeLibraryShellcode(Shellcode):
+class FreeLibraryPayload(Payload):
     """
     instantiates and egg like:
     ...
@@ -443,7 +443,7 @@ class FreeLibraryShellcode(Shellcode):
                  start_offset=0,
                  pseudo='invoke FreeLibrary',
                  ):
-        Shellcode.__init__(self,
+        Payload.__init__(self,
                            start_offset=start_offset,
                            pseudo=pseudo,
                            )
@@ -452,13 +452,13 @@ class FreeLibraryShellcode(Shellcode):
         self.call(WINAPI['FreeLibrary'])
                  
 
-class GetModuleHandleShellcode(Shellcode):
+class GetModuleHandlePayload(Payload):
     def __init__(self,
                  dll_name,
                  start_offset=0,
                  pseudo='invoke GetProcessHandle',
                  ):
-        Shellcode.__init__(self,
+        Payload.__init__(self,
                            start_offset=start_offset,
                            pseudo=pseudo,
                            )
@@ -466,7 +466,7 @@ class GetModuleHandleShellcode(Shellcode):
         self.call(WINAPI['GetModuleHandleA'])
 
                  
-class GetProcAddressShellcode(Shellcode):
+class GetProcAddressPayload(Payload):
     """
     instantiates an egg like:
     ...
@@ -482,7 +482,7 @@ class GetProcAddressShellcode(Shellcode):
                  start_offset=0,
                  pseudo='invoke GetProcAddress',
                  ):
-        Shellcode.__init__(self,
+        Payload.__init__(self,
                            start_offset=start_offset,
                            pseudo=pseudo,
                            )
@@ -491,7 +491,7 @@ class GetProcAddressShellcode(Shellcode):
         self.call(WINAPI['GetProcAddress'])
         
 
-class MessageBoxShellcode(Shellcode):
+class MessageBoxPayload(Payload):
     """
     instantiates an egg like:
     ...
@@ -510,7 +510,7 @@ class MessageBoxShellcode(Shellcode):
                  start_offset=0,
                  pseudo='invoke MessageBox',
                  ):
-        Shellcode.__init__(self,
+        Payload.__init__(self,
                            start_offset=start_offset,
                            pseudo=pseudo,
                            )
@@ -530,13 +530,13 @@ class TestAsmInstruction(unittest.TestCase):
         # asm.display()
         
 
-class TestShellcode(unittest.TestCase):
+class TestPayload(unittest.TestCase):
     def test__init(self):
-        sc = Shellcode()
+        sc = Payload()
         self.assertEqual(sc.getSize(), 0)
         
     def test_callEax(self):
-        sc = Shellcode(start_offset=0xDEADBEEF)
+        sc = Payload(start_offset=0xDEADBEEF)
         sc.pushDwPtrDs(0x404111)
         sc.movDwPtrDs2Eax(0x77550234)
         sc.callEax()
@@ -544,9 +544,9 @@ class TestShellcode(unittest.TestCase):
         sc.display()
 
     def test_jnz(self):
-        sc = Shellcode(0xDEADBEEF)
+        sc = Payload(0xDEADBEEF)
         sc.jmp(0xDEADDEEF)
-        self.assertEqual(sc.getSize(), UNCONDITIONALJMPSHELLCODE_LEN)
+        self.assertEqual(sc.getSize(), UNCONDITIONALJMPPAYLOAD_LEN)
         sc.display()
 
 if __name__ == '__main__':

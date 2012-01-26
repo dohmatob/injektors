@@ -1,9 +1,9 @@
 """
 (c) d0hm4t06 3. d0p91m4 (h4lf-jiffie)
 """
-from libshellcode.shellcode import *
-from libutils.constants import *
-from libutils.debug import *
+from libpayload.payload import *
+from libdebug.constants import *
+from libdebug.debug import *
 from ctypes import *
 import sys
 import os
@@ -57,7 +57,7 @@ def hack(target_pid,
  = 0x%08X)." %windll.kernel32.GetLastError())
         sys.exit(1)
     printDebug("OK.")
-    # make space for shellcode
+    # make space for payload
     printDebug("Allocating %d-byte code-cave in target process .." %CODECAVE_SIZE)
     codecave_addr = windll.kernel32.VirtualAllocEx(target_process_handle,
                                                    0,
@@ -71,7 +71,7 @@ def hack(target_pid,
         sys.exit(1)
     printDebug("OK (code-cave starts at 0x%08X)." %codecave_addr)
     if not createremotethread:
-        # we will hijack the primary thread of the target process and let it trigger our shellcode for us
+        # we will hijack the primary thread of the target process and let it trigger our payload for us
         printDebug("Obtaing remote process primary thread ID ..")
         primary_tid = GetPrimaryThreadId(target_pid)
         if not primary_tid:
@@ -99,28 +99,28 @@ def hack(target_pid,
 (windll.kernel32.GetLastError() = 0x%08X)." %windll.kernel32.GetLastError())
             sys.exit(1)
         printDebug("OK.")
-    printDebug("Building shellcode ..")
-    shellcode = Shellcode(start_offset=codecave_addr)
-    # start: build data-section of shellcode
-    err_caption_addr = shellcode.addConstStr("%s: Error:" %os.path.basename(sys.argv[0]))
-    ejection_failure_err_txt_addr = shellcode.addConstStr("Couldn't eject %s" %dll_name)
-    injection_failure_err_txt_addr = shellcode.addConstStr("Couldn't inject %s" %dll_path)
+    printDebug("Building payload ..")
+    payload = Payload(start_offset=codecave_addr)
+    # start: build data-section of payload
+    err_caption_addr = payload.addConstStr("%s: Error:" %os.path.basename(sys.argv[0]))
+    ejection_failure_err_txt_addr = payload.addConstStr("Couldn't eject %s" %dll_name)
+    injection_failure_err_txt_addr = payload.addConstStr("Couldn't inject %s" %dll_path)
     if dll_function:
-        dll_function_addr = shellcode.addConstStr(dll_function)
-        import_dll_function_failure_err_txt_addr = shellcode.addConstStr("Couldn't import %s API from %s" \
+        dll_function_addr = payload.addConstStr(dll_function)
+        import_dll_function_failure_err_txt_addr = payload.addConstStr("Couldn't import %s API from %s" \
                                                                              %(dll_function,dll_name))
-    # end: build data-section of shellcode
-    dll_addr = shellcode.addConstStr(dll_path)
-    EP  = shellcode.getCurrentOffset() # Entry Point
+    # end: build data-section of payload
+    dll_addr = payload.addConstStr(dll_path)
+    EP  = payload.getCurrentOffset() # Entry Point
     if createremotethread:
-        exitthread_EP = codecave_addr + CODECAVE_SIZE - EXITTHREADSHELLCODE_LEN
+        exitthread_EP = codecave_addr + CODECAVE_SIZE - EXITTHREADPAYLOAD_LEN
         prolog = exitthread_EP
-        exitthread_shellcode = ExitThreadShellcode(start_offset=exitthread_EP,
+        exitthread_payload = ExitThreadPayload(start_offset=exitthread_EP,
                                                   pseudo="exit thread",
                                                   )
-        freelibraryandexitthread_EP = exitthread_EP - FREELIBRARYANDEXITTHREADSHELLCODE_LEN - \
-            UNCONDITIONALJMPSHELLCODE_LEN
-        freelibraryandexitthread_shellcode = FreeLibraryAndExitThreadShellcode(dll_addr,
+        freelibraryandexitthread_EP = exitthread_EP - FREELIBRARYANDEXITTHREADPAYLOAD_LEN - \
+            UNCONDITIONALJMPPAYLOAD_LEN
+        freelibraryandexitthread_payload = FreeLibraryAndExitThreadPayload(dll_addr,
                                                                                start_offset=freelibraryandexitthread_EP,
                                                                                pseudo="unload %s and exit thread" \
                                                                                    %dll_name,
@@ -128,22 +128,22 @@ def hack(target_pid,
         end_of_seh = freelibraryandexitthread_EP
     else: 
         prolog = codecave_addr + CODECAVE_SIZE - 1 - 1 - 1 
-        freelibrary_EP = prolog - FREELIBRARYSHELLCODE_LEN - UNCONDITIONALJMPSHELLCODE_LEN 
-        freelibrary_shellcode = FreeLibraryShellcode(dll_addr,
+        freelibrary_EP = prolog - FREELIBRARYPAYLOAD_LEN - UNCONDITIONALJMPPAYLOAD_LEN 
+        freelibrary_payload = FreeLibraryPayload(dll_addr,
                                                     start_offset=freelibrary_EP,
                                                     pseudo="unload %s" %dll_name,
                                                     )
         end_of_seh = freelibrary_EP
     unload_dll_EP = end_of_seh
-    injection_failure_EP = end_of_seh - MESSAGEBOXSHELLCODE_LEN - UNCONDITIONALJMPSHELLCODE_LEN
-    injection_failure_shellcode = MessageBoxShellcode(injection_failure_err_txt_addr,
+    injection_failure_EP = end_of_seh - MESSAGEBOXPAYLOAD_LEN - UNCONDITIONALJMPPAYLOAD_LEN
+    injection_failure_payload = MessageBoxPayload(injection_failure_err_txt_addr,
                                                      err_caption_addr,
                                                      kind=MB_ICONERROR,
                                                      start_offset=injection_failure_EP,
                                                      pseudo="%s injection failure notification" %dll_name,
                                                       )
-    ejection_failure_EP = injection_failure_EP - MESSAGEBOXSHELLCODE_LEN - UNCONDITIONALJMPSHELLCODE_LEN
-    ejection_failure_shellcode = MessageBoxShellcode(ejection_failure_err_txt_addr,
+    ejection_failure_EP = injection_failure_EP - MESSAGEBOXPAYLOAD_LEN - UNCONDITIONALJMPPAYLOAD_LEN
+    ejection_failure_payload = MessageBoxPayload(ejection_failure_err_txt_addr,
                                                      err_caption_addr,
                                                      kind=MB_ICONERROR,
                                                      start_offset=ejection_failure_EP,
@@ -151,8 +151,8 @@ def hack(target_pid,
                                                      )
     start_of_seh = ejection_failure_EP # SEH = Structured-Exception-Handling
     if dll_function:
-        import_dll_function_failure_EP = start_of_seh - MESSAGEBOXSHELLCODE_LEN - UNCONDITIONALJMPSHELLCODE_LEN
-        import_dll_function_failure_shellcode = MessageBoxShellcode(import_dll_function_failure_err_txt_addr,
+        import_dll_function_failure_EP = start_of_seh - MESSAGEBOXPAYLOAD_LEN - UNCONDITIONALJMPPAYLOAD_LEN
+        import_dll_function_failure_payload = MessageBoxPayload(import_dll_function_failure_err_txt_addr,
                                                                     err_caption_addr,
                                                                     kind=MB_ICONERROR,
                                                                     start_offset=import_dll_function_failure_EP,
@@ -160,97 +160,97 @@ def hack(target_pid,
                                                                         %dll_function,
                                                                     )
         start_of_seh = import_dll_function_failure_EP
-    # start: build tail of shellcode
-    shellcode_tail = Shellcode(start_offset=start_of_seh)
+    # start: build tail of payload
+    payload_tail = Payload(start_offset=start_of_seh)
     if dll_function:
-        shellcode_tail.addShellcode(import_dll_function_failure_shellcode)
-        shellcode_tail.jmp(prolog)
-    shellcode_tail.addShellcode(ejection_failure_shellcode)
-    shellcode_tail.jmp(prolog)
-    shellcode_tail.addShellcode(injection_failure_shellcode)
-    shellcode_tail.jmp(prolog)
+        payload_tail.addPayload(import_dll_function_failure_payload)
+        payload_tail.jmp(prolog)
+    payload_tail.addPayload(ejection_failure_payload)
+    payload_tail.jmp(prolog)
+    payload_tail.addPayload(injection_failure_payload)
+    payload_tail.jmp(prolog)
     if createremotethread:
-        shellcode_tail.addShellcode(freelibraryandexitthread_shellcode)
-        shellcode_tail.jmp(prolog)
-        shellcode_tail.addShellcode(exitthread_shellcode)
+        payload_tail.addPayload(freelibraryandexitthread_payload)
+        payload_tail.jmp(prolog)
+        payload_tail.addPayload(exitthread_payload)
     else:
-        shellcode_tail.addShellcode(freelibrary_shellcode)
-        shellcode_tail.jmp(prolog)
-        shellcode_tail.addBlockEntryTag("carrier thread epilog")
-        shellcode_tail.popFd() # restore flags
-        shellcode_tail.popAd() # restore all general-purpose registers
-        shellcode_tail.ret()
-        shellcode_tail.addBlockExitTag("carrier thread epilog")
-    # end: build tail of shellcode
-    # start: build body of shellcode
+        payload_tail.addPayload(freelibrary_payload)
+        payload_tail.jmp(prolog)
+        payload_tail.addBlockEntryTag("carrier thread epilog")
+        payload_tail.popFd() # restore flags
+        payload_tail.popAd() # restore all general-purpose registers
+        payload_tail.ret()
+        payload_tail.addBlockExitTag("carrier thread epilog")
+    # end: build tail of payload
+    # start: build body of payload
     if not createremotethread:
-        shellcode.addBlockEntryTag("carrier thread prolog")
-        shellcode.push(primary_thread_ctx.Eip) # save EIP
-        shellcode.pushAd() # save all general-purpose registers
-        shellcode.pushFd() # save flags (EFLAGS)
-        shellcode.addBlockExitTag("carrier thread prolog")
-    get_dll_handle_shellcode = GetModuleHandleShellcode(dll_addr,
-                                                        start_offset=shellcode.getCurrentOffset(),
+        payload.addBlockEntryTag("carrier thread prolog")
+        payload.push(primary_thread_ctx.Eip) # save EIP
+        payload.pushAd() # save all general-purpose registers
+        payload.pushFd() # save flags (EFLAGS)
+        payload.addBlockExitTag("carrier thread prolog")
+    get_dll_handle_payload = GetModuleHandlePayload(dll_addr,
+                                                        start_offset=payload.getCurrentOffset(),
                                                         pseudo="get %s handle" %dll_name,
                                                         )
-    shellcode.addShellcode(get_dll_handle_shellcode)
-    shellcode.cmpEax(0x0)
+    payload.addPayload(get_dll_handle_payload)
+    payload.cmpEax(0x0)
     if eject:
-        shellcode.jz(ejection_failure_EP)
-        shellcode.saveEax(dll_addr)
-        shellcode.jmp(unload_dll_EP)
+        payload.jz(ejection_failure_EP)
+        payload.saveEax(dll_addr)
+        payload.jmp(unload_dll_EP)
     else:
-        shellcode.jnz(shellcode.getCurrentOffset() + CONDITIONALJMPSHELLCODE_LEN + LOADLIBRARYSHELLCODE_LEN)
-    load_dll_shellcode = LoadLibraryShellcode(dll_addr,
-                                              start_offset=shellcode.getCurrentOffset(),
+        payload.jnz(payload.getCurrentOffset() + CONDITIONALJMPPAYLOAD_LEN + LOADLIBRARYPAYLOAD_LEN)
+    load_dll_payload = LoadLibraryPayload(dll_addr,
+                                              start_offset=payload.getCurrentOffset(),
                                               pseudo="load %s" %dll_name,
                                               )
-    shellcode.addShellcode(load_dll_shellcode)
-    shellcode.cmpEax(0x0)
-    shellcode.jz(injection_failure_EP)
-    shellcode.saveEax(dll_addr)
+    payload.addPayload(load_dll_payload)
+    payload.cmpEax(0x0)
+    payload.jz(injection_failure_EP)
+    payload.saveEax(dll_addr)
     if dll_function: 
-        import_dll_function_shellcode = GetProcAddressShellcode(dll_addr,
+        import_dll_function_payload = GetProcAddressPayload(dll_addr,
                                                                 dll_function_addr,
-                                                                start_offset=shellcode.getCurrentOffset(),
+                                                                start_offset=payload.getCurrentOffset(),
                                                                 pseudo="import %s API from %s" %(dll_function,dll_name),
                                                                 )
-        shellcode.addShellcode(import_dll_function_shellcode)
-        shellcode.cmpEax(0x0)
-        shellcode.jz(import_dll_function_failure_EP)
-        shellcode.saveEax(dll_function_addr)
-        shellcode.addBlockExitTag("invoke %s(..)" %dll_function)
+        payload.addPayload(import_dll_function_payload)
+        payload.cmpEax(0x0)
+        payload.jz(import_dll_function_failure_EP)
+        payload.saveEax(dll_function_addr)
+        payload.addBlockExitTag("invoke %s(..)" %dll_function)
         if dll_function_args:
             l = len(dll_function_args)
             for j in xrange(l):
-                shellcode.push(int(dll_function_args[l - j - 1]))
-        shellcode.callByReference(dll_function_addr)
-        shellcode.addBlockExitTag("invoke %s(..)" %dll_function)
-    shellcode.jmp(prolog)
-    shellcode.nopSled(start_of_seh - shellcode.getCurrentOffset())
-    # end: build body of shellcode
-    shellcode.addShellcode(shellcode_tail)
-    shellcode.display()
-    printDebug("OK (shellcode EP = 0x%08X)." %EP)
+                payload.push(int(dll_function_args[l - j - 1]))
+        payload.callByReference(dll_function_addr)
+        payload.addBlockExitTag("invoke %s(..)" %dll_function)
+    payload.jmp(prolog)
+    payload.nopSled(start_of_seh - payload.getCurrentOffset())
+    # end: build body of payload
+    payload.addPayload(payload_tail)
+    payload.display()
+    printDebug("OK (payload EP = 0x%08X)." %EP)
     # sys.exit(0)
-    # copy shellcode to remote code-cave dug earlier
-    printDebug("Writing shellcode to code-cave in remote process ..")
+    # copy payload to remote code-cave dug earlier
+    printDebug("Writing payload to code-cave in remote process ..")
     nb_bytes_written = DWORD(0)
     copy_OK = windll.kernel32.WriteProcessMemory(target_process_handle,
                                                  codecave_addr,
-                                                 shellcode.getEgg(),
-                                                 shellcode.getSize(),
+                                                 payload.getEgg(),
+                                                 payload.getSize(),
                                                  byref(nb_bytes_written), 
                                                  )
-    copy_OK = copy_OK and (nb_bytes_written.value == shellcode.getSize())
+    copy_OK = copy_OK and (nb_bytes_written.value == payload.getSize())
     if not copy_OK: # error-check
-        printDebug("Error: windll.kernel32.WirteProcessMeMemory: couldn't copy shellcode to code-cave in remote process \
+        printDebug("Error: windll.kernel32.WirteProcessMeMemory: couldn't copy payload to code-cave in remote process \
 (windll.kernel32.GetLastError() = 0x%08X)." %windll.kernel32.GetLastError())
         sys.exit(1)
     printDebug("OK.")
     # start: deploy carrier thread
     if createremotethread:
-        printDebug("Creating remote shellcode carrier thread in target process ..")
+        printDebug("Creating remote payload carrier thread in target process ..")
         carrier_tid = DWORD(0)
         carrier_thread_handle = windll.kernel32.CreateRemoteThread(target_process_handle,
                                                                    0,
@@ -267,7 +267,7 @@ def hack(target_pid,
         printDebug("OK (carrier thread ID = %d)." %carrier_tid.value)
         windll.kernel32.WaitForSingleObject(carrier_thread_handle, INFINITE)
     else:
-        printDebug("Hijacking target process primary thread to execute shellcode ..")
+        printDebug("Hijacking target process primary thread to execute payload ..")
         primary_thread_ctx.Eip = EP
         windll.kernel32.SetThreadContext(primary_thread_handle,
                                          byref(primary_thread_ctx),
@@ -300,8 +300,8 @@ TrapScore $(python -c \"print 0x010196BE\")" %sys.argv[0]
                       dest='hijackprimarythread',
                       action='store_true',
                       default=False,
-                      help="""hijack target process primary thread and use it as shellcode-carrier (by default, we'll \
-create a brand-new shellcode-carrier thread)""",
+                      help="""hijack target process primary thread and use it as payload-carrier (by default, we'll \
+create a brand-new payload-carrier thread)""",
                       )
     parser.add_option('--function',
                       dest='function',

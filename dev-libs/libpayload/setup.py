@@ -1,9 +1,9 @@
 from distutils.core import setup
 
 setup(
-    name='libutils',
+    name='libpayload',
     version='0.1dev',
-    packages =[ 'libutils',],
+    packages =[ 'libpayload',],
     license='GPL',
     long_description=open('README').read(),
     )
