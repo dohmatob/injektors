@@ -35,7 +35,7 @@ def handler_breakpoint(pydbg):
                                    )
     windll.kernel32.SuspendThread(h)
     windll.kernel32.GetThreadContext(h, byref(thread_ctx))
-    # hijack poison thread here by manipulating thread_ctx and committing!
+    # by manipulating thread_ctx and committing, we could do really evil things here! No ?
     if (thread_ctx.Edx < previous_score):
         log("Game restarting ? New player ?")
     log('Current pinball score is %d' %thread_ctx.Edx)
