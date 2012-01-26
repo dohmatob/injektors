@@ -1,8 +1,31 @@
-+++++++++++++++++++++++++++++++++++++
-+ HERE BE CODE FOR DLLI AND THE ILK +
-+++++++++++++++++++++++++++++++++++++
+++++++++++
++ README +
+++++++++++
 
 (c) h4lf-jiffie (dohmatob elvis dopgima)
+
+injecktors is a tiny python command-line framework doing such business like: dll/code injection (win32 only), run-time 
+and static memory patching, sql injection, etc.
+
+For the moment, it only implements dll/code injection.
+
+It is structured as follows:
+
+├───dev-libs <-- helper packages/libraries
+│   ├───libdebug <-- herebe implemented APIs for debugging and stuff (see corresponding README file)
+│   │   └───libdebug 
+│   └───libpayload <-- here be implemented APIs for shellcode generation (see corresponding README file)
+│       └───libpayload
+├───injection <-- herebe scripts that perform the injection proper (see corresponding README file)
+│   └───dll_injection
+└───patching <-- herebe scripts for memory search, patching, etc. (see corresponding README file)
+
++++++++++++++++
++ Dependences +
++++++++++++++++
+
+Be sure to install the following python dependencies:
+1]- pefile-1.2.10-114 (http://code.google.com/p/pefile/downloads/list)
 
 ++++++++++++++++
 + INSTALLATION +
