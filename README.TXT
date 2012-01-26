@@ -11,6 +11,7 @@
 Quite simple ..
 
 step 1]- build and install the libdebug package by running the following 'python setup.py install' command:
+[snip]
 PS C:\Users\rude-boi\CODE\injektors> cd .\dev-libs\libdebug
 PS C:\Users\rude-boi\CODE\injektors\dev-libs\libdebug> python setup.p
 running install
@@ -28,8 +29,10 @@ running install_egg_info
 Removing C:\python27\Lib\site-packages\libdebug-0.1dev-py2.7.egg-info
 Writing C:\python27\Lib\site-packages\libdebug-0.1dev-py2.7.egg-info
 PS C:\Users\rude-boi\CODE\injektors\dev-libs\libdebug>
+[snip]
 
 step 2]- build and install the libpayload package by running the following 'python setup.py install' command:
+[snip]
 PS C:\Users\rude-boi\CODE\injektors\dev-libs\libdebug> cd ..\libpayload
 PS C:\Users\rude-boi\CODE\injektors\dev-libs\libpayload> python setup.py install
 running install
@@ -46,7 +49,8 @@ Removing C:\python27\Lib\site-packages\libpayload-0.1dev-py2.7.egg-info
 Writing C:\python27\Lib\site-packages\libpayload-0.1dev-py2.7.egg-info
 PS C:\Users\rude-boi\CODE\injektors\dev-libs\libpayload>
 PS C:\Users\rude-boi\CODE\injektors\dev-libs\libpayload> cd ../..
-   
+[snip]
+
 +++++++++++
 + USAGE ? +
 +++++++++++
