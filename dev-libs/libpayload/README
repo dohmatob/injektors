@@ -1,3 +1,194 @@
 ++++++++++++
 +- README -+
 ++++++++++++
+
+This helper package/library is for generating x86 payloads for win32 arch. Of course, python's ctypes does the 
+magic back-end.
+
+++++++++
++ Why? +
+++++++++
+
+If you are in the injection business, then very often you need to build payloads (to be impregnated in the target process 
+and triggered by a remote thread, for example) for routine stuff like:
+
+- dll loading (LoadLibraryA API)
+- dll unloading (FreeLibraryA API) 
+- exit thread (ExitThread API)
+- unload dll and exit thread (FreeLibraryAndExitThread API)
+- etc.
+
+Or, maybe you'd just wish to bring-in asm instructions opcodes for stuff like:
+
+- popad ; save regs
+- pushfd ; save eflags
+- popfd ; restore eflags
+- jnz 0xDEADBEEF
+- call eax
+- cmp eax, 0x0
+- etc.
+
+Well this library (libpayload) simplifies your work. This way, you can concentrate on your injection logic proper, then 
+use the library's APIs to constructured your payload components/gadgets. This saves coding/debugging effort. Please see 
+libpayload/payload.py for documented code.
+
+++++++++++++
++ USE-CASE +
+++++++++++++
+
+Herein, we'll demonstrate the use of libpayload to pop a message-box (with a naggy message, --of course!) in notepad.
+So, fire up a python terminal ..
+[snip]
+PS C:\Users\rude-boi\CODE\injektors> python
+Python 2.7.1 (r271:86832, Nov 27 2010, 18:30:46) [MSC v.1500 32 bit (Intel)] on win32
+Type "help", "copyright", "credits" or "license" for more information.
+>>> from libpayload.payload import *
+>>> from ctypes import *
+>>> from libdebug.debug import *
+>>> notepad_pid = GetProcessIdFromName('notepad')
+>>> notepad_pid
+4852L
+>>> from libdebug.constants import *
+>>> notepad_handle = windll.kernel32.OpenProcess(PROCESS_ALL_ACCESS,0,notepad_pid)
+>>> notepad_handle
+136
+>>> codecave_addr = windll.kernel32.VirtualAllocEx(notepad_handle,0,300,MEM_COMMIT,PAGE_EXECUTE_READWRITE)
+>>> '0x%08X'%codecave_addr
+'0x013F0000' <-- this is where our 330-byte gadget will begin
+>>> gadget=Payload(start_offset=codecave_addr)
+>>> user32dll_addr=gadget.addConstStr("user32.dll") <-- name of dll to load
+>>> hello_caption_addr=gadget.addConstStr("NAG!") <-- address of message-box caption
+>>> hello_txt_addr=gadget.addConstStr("hELLo, popEtte!") <-- address of message-box text
+>>> gadget.display()
+        013F0000:                          DB "user32.dll",0
+        013F000B:                          DB "NAG!",0
+        013F0010:                          DB "hELLo, popEtte!",0
+>>> EP = gadget.getCurrentOffset() <-- Entry-Point: our carrier-thread's Eip should point here
+>>> '0x%08X'%EP
+'0x013F0020' 
+>>> load_user32dll_gadget=LoadLibraryPayload(user32dll_addr,start_offset=gadget.getCurrentOffset()) <-- this starts at EP 
+>>> load_user32dll_gadget.display()
+        013F0020:           68 00 00 3F 01 PUSH 0x13F0000
+        013F0025:           B8 04 28 CA 77 MOV EAX, 0x77CA2804
+        013F002A:                    FF D0 CALL EAX
+>>> gadget.addPayload(load_user32dll_gadget) <-- bring-in gadget to trigger dll (user32.dll) loading
+>>> gadget.display() <-- let's see what our gadget looks like so far :)
+        013F0000:                          DB "user32.dll",0
+        013F000B:                          DB "NAG!",0
+        013F0010:                          DB "hELLo, popEtte!",0
+        ->| START OF BLOCK (invoke LoadLibraryA)
+        013F0020:           68 00 00 3F 01 PUSH 0x13F0000
+        013F0025:           B8 04 28 CA 77 MOV EAX, 0x77CA2804
+        013F002A:                    FF D0 CALL EAX
+        |<- END OF BLOCK (invoke LoadLibraryA)
+>>> hello_msgb_gadget=MessageBoxPayload(hello_txt_addr,hello_caption_addr,start_offset=gadget.getCurrentOffset())
+>>> hello_msgb_gadget.display()
+        013F002C:                    6A 40 PUSH 0x40
+        013F002E:           68 0B 00 3F 01 PUSH 0x13F000B
+        013F0033:           68 10 00 3F 01 PUSH 0x13F0010
+        013F0038:                    6A 00 PUSH 0x0
+        013F003A:           B8 71 EA 1D 76 MOV EAX, 0x761DEA71
+        013F003F:                    FF D0 CALL EAX
+>>> gadget.addPayload(hello_msgb_gadget) <-- bring in message-box gadget
+>>> gadget.display() <-- looks sexy (notice the informative block tagging)
+        013F0000:                          DB "user32.dll",0
+        013F000B:                          DB "NAG!",0
+        013F0010:                          DB "hELLo, popEtte!",0
+        ->| START OF BLOCK (invoke LoadLibraryA)
+        013F0020:           68 00 00 3F 01 PUSH 0x13F0000
+        013F0025:           B8 04 28 CA 77 MOV EAX, 0x77CA2804
+        013F002A:                    FF D0 CALL EAX
+        |<- END OF BLOCK (invoke LoadLibraryA)
+        ->| START OF BLOCK (invoke MessageBox)
+        013F002C:                    6A 40 PUSH 0x40
+        013F002E:           68 0B 00 3F 01 PUSH 0x13F000B
+        013F0033:           68 10 00 3F 01 PUSH 0x13F0010
+        013F0038:                    6A 00 PUSH 0x0
+        013F003A:           B8 71 EA 1D 76 MOV EAX, 0x761DEA71
+        013F003F:                    FF D0 CALL EAX
+        |<- END OF BLOCK (invoke MessageBox)
+>>> exitthread_gadget=ExitThreadPayload(start_offset=gadget.getCurrentOffset()) 
+>>> exitthread_gadget.display()
+        013F0041:                    6A 00 PUSH 0x0
+        013F0043:           B8 71 05 D6 77 MOV EAX, 0x77D60571
+        013F0048:                    FF D0 CALL EAX
+>>> gadget.addPayload(exitthread_gadget) <-- bring-in gadget to exit carrier thread
+>>> gadget.display()
+        013F0000:                          DB "user32.dll",0
+        013F000B:                          DB "NAG!",0
+        013F0010:                          DB "hELLo, popEtte!",0
+        ->| START OF BLOCK (invoke LoadLibraryA)
+        013F0020:           68 00 00 3F 01 PUSH 0x13F0000
+        013F0025:           B8 04 28 CA 77 MOV EAX, 0x77CA2804
+        013F002A:                    FF D0 CALL EAX
+        |<- END OF BLOCK (invoke LoadLibraryA)
+        ->| START OF BLOCK (invoke MessageBox)
+        013F002C:                    6A 40 PUSH 0x40
+        013F002E:           68 0B 00 3F 01 PUSH 0x13F000B
+        013F0033:           68 10 00 3F 01 PUSH 0x13F0010
+        013F0038:                    6A 00 PUSH 0x0
+        013F003A:           B8 71 EA 1D 76 MOV EAX, 0x761DEA71
+        013F003F:                    FF D0 CALL EAX
+        |<- END OF BLOCK (invoke MessageBox)
+        ->| START OF BLOCK (invoke ExitThread)
+        013F0041:                    6A 00 PUSH 0x0
+        013F0043:           B8 71 05 D6 77 MOV EAX, 0x77D60571
+        013F0048:                    FF D0 CALL EAX
+        |<- END OF BLOCK (invoke ExitThread)
+>>> windll.kernel32.WriteProcessMemory(notepad_handle,codecave_addr,gadget.getEgg(),gadget.getSize(),0) <-- fill-up cave
+1 <-- OK!
+>>> carrier_tid=DWORD()
+>>> carrier_handle=windll.kernel32.CreateRemoteThread(notepad_handle,0,0,EP,0,0,byref(carrier_tid)) <-- carrier thread
+>>> carrier_tid.value
+6124L
+>>> windll.kernel32.WaitForSingleObject(carrier_handle,INFINITE) <-- by now, you should see a jolie message-box popup!
+[snip]
+
+If you have pydasm installed, then you may try disassembling our gadget's egg, just for fun. Indeed,
+[snip]
+>>> import pydasm
+>>> egg = gadget.getEgg()
+>>> offset=0
+>>> egg_size = gadget.getSize()
+>>> egg
+'user32.dll\x00NAG!\x00hELLo, popEtte!\x00h\x00\x00?\x01\xb8\x04(\xcaw\xff\xd0j@h\x0b\x00?\x01h\x10\x00?\x01j\x00\xb8q\x
+ea\x1dv\xff\xd0j\x00\xb8q\x05\xd6w\xff\xd0'
+>>> egg_size
+74
+>>> while offset<egg_size:
+...     i = pydasm.get_instruction(egg[offset:],pydasm.MODE_32)
+...     print pydasm.get_instruction_string(i,pydasm.FORMAT_INTEL,0)
+...     if not i:
+...             break
+...     offset+=i.length
+...
+jnz 0x75
+?? jc 0x36
+xor ch,[esi]
+fs insb
+insb
+add [esi+0x41],cl
+inc edi
+and [eax],eax
+push dword 0x6f4c4c45
+sub al,0x20
+jo 0x71
+jo 0x47
+jz 0x76
+and gs:[eax],eax
+push dword 0x13f0000
+mov eax,0x77ca2804
+call eax
+push byte 0x40
+push dword 0x13f000b
+push dword 0x13f0010
+push byte 0x0
+mov eax,0x761dea71
+call eax
+push byte 0x0
+mov eax,0x77d60571
+call eax
+>>>
+[snip]
+
+That's all for now :)
