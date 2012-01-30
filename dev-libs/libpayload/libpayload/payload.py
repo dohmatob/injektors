@@ -118,13 +118,13 @@ class Payload:
     def display(self):
         for offset in self._offsets:
             if offset in self._block_exit_tags:
-                print '\t|<- END OF BLOCK (%s)' %self._block_exit_tags[offset]
+                print '\t|<- END OF BLOCK   "%s"' %self._block_exit_tags[offset]
             if offset in self._block_entry_tags:
-                print '\t->| START OF BLOCK (%s)' %self._block_entry_tags[offset]
+                print '\t->| START OF BLOCK "%s"' %self._block_entry_tags[offset]
             self._asm_instructions[offset].display()
         for offset in self._block_exit_tags:
             if not offset in self._offsets:
-                print '\t|<- END OF BLOCK (%s)' %self._block_exit_tags[offset]
+                print '\t|<- END OF BLOCK   "%s"' %self._block_exit_tags[offset]
                 break
 
     def getOffsets(self):
@@ -236,7 +236,6 @@ class Payload:
                              self._current_offset,
                              )
         self.addAsmInstruction(asm)
-
 
     def jmp(self, addr):
         opcodes = "\xE9" + struct.pack("<I", addr - self._current_offset - UNCONDITIONALJMPPAYLOAD_LEN)
