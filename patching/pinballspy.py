@@ -38,7 +38,7 @@ if __name__ == '__main__':
     # register a breakpoint handler function.
     debugger.set_callback(EXCEPTION_BREAKPOINT, handler_breakpoint)
     log("Obtaining pinball PID ..")
-    pinball_pid = GetProcessIdFromName('pinballl')
+    pinball_pid = GetProcessIdFromName('pinball')
     if not pinball_pid:
         log("Error: couldn't get pinball PID (is pinball even running? If so, tell me its PID).")
         pinball_pid = int(raw_input("[+] Enter pinball PID: "))
