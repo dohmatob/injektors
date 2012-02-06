@@ -9,7 +9,6 @@ import sys
 import os
 import re
 import struct
-import pefile
 
 __AUTHOR__ = 'd0hm4t06 3. d0p91m4 (half-jiffie)'
 __VERSION__ = '1.0dev'
@@ -171,6 +170,12 @@ def FindSignatureInBinaryFile(filename,
     """
     Passively scrapes a specified program (PE binary file), looking for a specified signature (string of bytes)
     """
+    try:
+        import pefile
+    except ImportError:
+        print "[+] Error: FindSignatureInBinaryFile: you don't have pefile installed on your python path; \
+this feature won't work"
+        sys.exit(1)
     pe_obj = pefile.PE(filename) 
     for item in re.finditer(byte_seq,
                             pe_obj.get_memory_mapped_image(), 
