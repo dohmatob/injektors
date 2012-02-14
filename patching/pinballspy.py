@@ -48,11 +48,14 @@ if __name__ == '__main__':
     debugger = pydbg()
     # register a breakpoint handler function.
     debugger.set_callback(EXCEPTION_BREAKPOINT, handler_breakpoint)
-    log("Obtaining pinball PID ..")
-    pinball_pid = GetProcessIdFromName('pinball')
-    if not pinball_pid:
-        die("Error: couldn't get pinball PID (is pinball even running ?).")
-    log("OK.")
+    if len(sys.argv) > 1:
+        pinball_pid = int(sys.argv[1])
+    else:
+        log("Obtaining pinball PID ..")
+        pinball_pid = GetProcessIdFromName('pinball')
+        if not pinball_pid:
+            die("Error: couldn't get pinball PID (is pinball even running ?).")
+        log("OK.")
     log("Searching for characteristic '%s' signature in pinball process memory .."%pinball_signature)
     pinball_handle = windll.kernel32.OpenProcess(PROCESS_ALL_ACCESS, 
                                                  0, 
