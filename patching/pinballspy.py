@@ -4,16 +4,13 @@ technology: pydbg, libdebug, ctypes
 
 By h4lf-jiffie (dohmatob elvis dopgima)
 """
+from ctypes import *
+from libdebug.debug import GetProcessIdFromName, FindSignatureInProcessMemory
 from pydbg import *
 from pydbg.defines import *
-from libdebug.debug import *
 import sys
-from ctypes import * 
-from libdebug.constants import *
 
 pinball_signature = "\x01\x30\x8B\x10\x81\xFA\x00\xCA\x9A\x3B"
-thread_ctx = CONTEXT()
-thread_ctx.ContextFlags = CONTEXT_FULL # we own this thing!
 previous_score = 0
 
 def log(msg):
@@ -23,31 +20,25 @@ def die(reason):
     log(reason)
     sys.exit(1)
 
-def handler_breakpoint(pydbg):
+def handler_breakpoint(pydebugger):
     global previous_score
     # ignore the first windows driven breakpoint. # <-- if uncle PEDRAM thinks so, it must be so!
-    if pydbg.first_breakpoint:
+    if pydebugger.first_breakpoint:
         return DBG_CONTINUE
-    # log("bp hit from thread %d /@%08x" % (pydbg.dbg.dwThreadId, pydbg.exception_address))
-    h = windll.kernel32.OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, 
-                                   0, 
-                                   pydbg.dbg.dwThreadId,
-                                   )
-    windll.kernel32.SuspendThread(h)
-    windll.kernel32.GetThreadContext(h, byref(thread_ctx))
-    # by manipulating thread_ctx and committing, we could do really evil things here! No ?
-    if (thread_ctx.Edx < previous_score):
+
+    # at this point, the EDX register of the debuggee's current thread's context contains the current pinball score! 
+    if (pydebugger.context.Edx < previous_score):
         log("Game restarting ? New player ?")
-    log('Current pinball score is %d' %thread_ctx.Edx)
-    previous_score = thread_ctx.Edx
-    windll.kernel32.ResumeThread(h)
-    windll.kernel32.CloseHandle(h)
+    log('Current pinball score is %d' %pydebugger.context.Edx)
+    previous_score = pydebugger.context.Edx
     return DBG_CONTINUE
     
 if __name__ == '__main__':
     debugger = pydbg()
     # register a breakpoint handler function.
     debugger.set_callback(EXCEPTION_BREAKPOINT, handler_breakpoint)
+
+    # obtain pinball PID
     if len(sys.argv) > 1:
         pinball_pid = int(sys.argv[1])
     else:
@@ -56,6 +47,8 @@ if __name__ == '__main__':
         if not pinball_pid:
             die("Error: couldn't get pinball PID (is pinball even running ?).")
         log("OK.")
+
+    # search for pinball signature in process memory
     log("Searching for characteristic '%s' signature in pinball process memory .."%pinball_signature)
     pinball_handle = windll.kernel32.OpenProcess(PROCESS_ALL_ACCESS, 
                                                  0, 
@@ -75,7 +68,9 @@ if __name__ == '__main__':
             pass
     except StopIteration:
         die("Error: oops! couldn't find characteristic signature in pinball process (this is strange!); aborting ..\n")
-    log("OK (Found signature at 0x%08X)." %grail)
+
+    # do ya stuff
+    log("OK (Found signature at 0x%08X)." %(grail - 4))
     log("Attaching to pinball process ..")
     debugger.attach(pinball_pid)
     log("OK.")
