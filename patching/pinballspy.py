@@ -72,9 +72,9 @@ if __name__ == '__main__':
             pass
     except StopIteration:
         die("Error: oops! couldn't find characteristic signature in pinball process (this is strange!); aborting ..\n")
-    log_debug("OK (Found signature at 0x%08X)." %(grail - 4))
 
-    # hack
+    # do ya stuff
+    log_debug("OK (Found signature at 0x%08X)." %(grail - 4))
     log_debug("Attaching to pinball process ..")
     debugger.attach(pinball_pid)
     log_debug("OK.")

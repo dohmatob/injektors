@@ -186,6 +186,15 @@ class Payload:
                              self._current_offset
                              )
         self.addAsmInstruction(asm)
+
+    def retn(self):
+        opcodes = '\xC3'
+        mnemonic = "RETN"
+        asm = AsmInstruction(opcodes,
+                             mnemonic,
+                             self._current_offset
+                             )
+        self.addAsmInstruction(asm)
         
     def retn(self):
         self.ret()

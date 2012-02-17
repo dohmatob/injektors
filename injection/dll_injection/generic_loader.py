@@ -29,6 +29,7 @@ def hack(target_pid,
          dll_function=None,
          dll_function_args=None,
          ):
+    # print config
     dll_name = os.path.basename(dll_path)
     printDebug("+++CONFIGURATION+++")
     printDebug("\tTARGET PID       : %s" %target_pid)
@@ -46,6 +47,7 @@ def hack(target_pid,
         printDebug("\tDLL FUNCTION     : %s" %dll_function)
         if dll_function_args:
             printDebug("\tDLL FUNCTION ARGS: %s" %' '.join(dll_function_args))
+
     # obtain handle to target process
     printDebug("Obtaining handle to target process ..")
     target_process_handle = windll.kernel32.OpenProcess(PROCESS_ALL_ACCESS,
@@ -57,6 +59,7 @@ def hack(target_pid,
  = 0x%08X)." %windll.kernel32.GetLastError())
         sys.exit(1)
     printDebug("OK.")
+
     # make space for payload
     printDebug("Allocating %d-byte code-cave in target process .." %CODECAVE_SIZE)
     codecave_addr = windll.kernel32.VirtualAllocEx(target_process_handle,
@@ -70,6 +73,8 @@ def hack(target_pid,
  = 0x%08X)." %windll.kernel32.GetLastError())
         sys.exit(1)
     printDebug("OK (code-cave starts at 0x%08X)." %codecave_addr)
+
+    # if not createremotethread option, prepare to hijack target process primary thread
     if not createremotethread:
         # we will hijack the primary thread of the target process and let it trigger our payload for us
         printDebug("Obtaing remote process primary thread ID ..")
@@ -99,19 +104,24 @@ def hack(target_pid,
 (windll.kernel32.GetLastError() = 0x%08X)." %windll.kernel32.GetLastError())
             sys.exit(1)
         printDebug("OK.")
+
     printDebug("Building payload ..")
+
+    # instantiate payload
     payload = Payload(start_offset=codecave_addr)
-    # start: build data-section of payload
-    err_caption_addr = payload.addConstStr("%s: Error:" %os.path.basename(sys.argv[0]))
+
+    # push offset strings
+    err_caption_addr = payload.addConstStr("%s: Error:" %os.path.basename(sys.argv[0])) 
     ejection_failure_err_txt_addr = payload.addConstStr("Couldn't eject %s" %dll_name)
     injection_failure_err_txt_addr = payload.addConstStr("Couldn't inject %s" %dll_path)
     if dll_function:
         dll_function_addr = payload.addConstStr(dll_function)
         import_dll_function_failure_err_txt_addr = payload.addConstStr("Couldn't import %s API from %s" \
                                                                              %(dll_function,dll_name))
-    # end: build data-section of payload
     dll_addr = payload.addConstStr(dll_path)
-    EP  = payload.getCurrentOffset() # Entry Point
+
+    # calculate payload entry-point
+    EP  = payload.getCurrentOffset() 
     if createremotethread:
         exitthread_EP = codecave_addr + CODECAVE_SIZE - EXITTHREADPAYLOAD_LEN
         prolog = exitthread_EP
@@ -134,6 +144,8 @@ def hack(target_pid,
                                                     pseudo="unload %s" %dll_name,
                                                     )
         end_of_seh = freelibrary_EP
+
+    # build sub-payloads (error-notifiers/seh blocks, loader, unloader, etc.)
     unload_dll_EP = end_of_seh
     injection_failure_EP = end_of_seh - MESSAGEBOXPAYLOAD_LEN - UNCONDITIONALJMPPAYLOAD_LEN
     injection_failure_payload = MessageBoxPayload(injection_failure_err_txt_addr,
@@ -160,7 +172,8 @@ def hack(target_pid,
                                                                         %dll_function,
                                                                     )
         start_of_seh = import_dll_function_failure_EP
-    # start: build tail of payload
+
+    # build payload tail (error-notifiers, etc., live here)
     payload_tail = Payload(start_offset=start_of_seh)
     if dll_function:
         payload_tail.addPayload(import_dll_function_failure_payload)
@@ -179,10 +192,8 @@ def hack(target_pid,
         payload_tail.addBlockEntryTag("carrier thread epilog")
         payload_tail.popFd() # restore flags
         payload_tail.popAd() # restore all general-purpose registers
-        payload_tail.ret()
+        payload_tail.retn()
         payload_tail.addBlockExitTag("carrier thread epilog")
-    # end: build tail of payload
-    # start: build body of payload
     if not createremotethread:
         payload.addBlockEntryTag("carrier thread prolog")
         payload.push(primary_thread_ctx.Eip) # save EIP
@@ -228,11 +239,10 @@ def hack(target_pid,
         payload.addBlockExitTag("invoke %s(..)" %dll_function)
     payload.jmp(prolog)
     payload.nopSled(start_of_seh - payload.getCurrentOffset())
-    # end: build body of payload
     payload.addPayload(payload_tail)
     payload.display()
     printDebug("OK (payload EP = 0x%08X)." %EP)
-    # sys.exit(0)
+    
     # copy payload to remote code-cave dug earlier
     printDebug("Writing payload to code-cave in remote process ..")
     nb_bytes_written = DWORD(0)
@@ -248,7 +258,8 @@ def hack(target_pid,
 (windll.kernel32.GetLastError() = 0x%08X)." %windll.kernel32.GetLastError())
         sys.exit(1)
     printDebug("OK.")
-    # start: deploy carrier thread
+
+    # deploy carrier thread
     if createremotethread:
         printDebug("Creating remote payload carrier thread in target process ..")
         carrier_tid = DWORD(0)
@@ -275,6 +286,7 @@ def hack(target_pid,
         windll.kernel32.ResumeThread(primary_thread_handle)
         windll.kernel32.WaitForSingleObject(primary_thread_handle, INFINITE)
         printDebug("OK.")
+
     # free code-cave
     printDebug("Freeing code-cave in target process ..")
     codecave_addr = windll.kernel32.VirtualFreeEx(target_process_handle,
