@@ -187,6 +187,9 @@ class Payload:
                              )
         self.addAsmInstruction(asm)
         
+    def retn(self):
+        self.ret()
+
     def nop(self):
         opcodes = "\x90"
         mnemonic = 'NOP'
@@ -296,6 +299,42 @@ class Payload:
                              )
         self.addAsmInstruction(asm)
 
+    def pushEax(self):
+        opcodes = '\x50'
+        mnemonic = "PUSH EAX"
+        asm = AsmInstruction(opcodes,
+                             mnemonic,
+                             offset=self._current_offset,
+                             )
+        self.addAsmInstruction(asm)
+
+    def pushEcx(self):
+        opcodes = '\x51'
+        mnemonic = "PUSH ECX"
+        asm = AsmInstruction(opcodes,
+                             mnemonic,
+                             offset=self._current_offset,
+                             )
+        self.addAsmInstruction(asm)
+
+    def pushEbx(self):
+        opcodes = '\x53'
+        mnemonic = "PUSH EBX"
+        asm = AsmInstruction(opcodes,
+                             mnemonic,
+                             offset=self._current_offset,
+                             )
+        self.addAsmInstruction(asm)
+
+    def pushEdx(self):
+        opcodes = '\x52'
+        mnemonic = "PUSH EDX"
+        asm = AsmInstruction(opcodes,
+                             mnemonic,
+                             offset=self._current_offset,
+                             )
+        self.addAsmInstruction(asm)
+
     def pushAd(self):
         opcodes = '\x60'
         mnemonic = "PUSHAD"
@@ -326,6 +365,24 @@ class Payload:
     def popFd(self):
         opcodes = '\x9D'
         mnemonic = "POPFD"
+        asm = AsmInstruction(opcodes,
+                             mnemonic,
+                             offset=self._current_offset,
+                             )
+        self.addAsmInstruction(asm)
+
+    def popEax(self):
+        opcodes = '\x58'
+        mnemonic = "POP EAX"
+        asm = AsmInstruction(opcodes,
+                             mnemonic,
+                             offset=self._current_offset,
+                             )
+        self.addAsmInstruction(asm)
+
+    def popEcx(self):
+        opcodes = '\x59'
+        mnemonic = "POP ECX"
         asm = AsmInstruction(opcodes,
                              mnemonic,
                              offset=self._current_offset,
