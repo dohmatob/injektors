@@ -19,7 +19,7 @@ Re-write this README from from scratch!
 
 1. Sample usage
 +++++++++++++++
-Below, we inject ghp_inject.dll into process with PID = 7748.
+Below, we eject ghp_inject.dll from process with PID 7748.
 
 PS C:\users\rude-boi> python .\gadgets.py 7748 '.\Downloads\ghpython_src\src\ghp_inject.dll' unload
 +++++++++++++ gadgets.py by h4lf-j1ff13 (dohmatob elvis dopgima) +++++++++++++
