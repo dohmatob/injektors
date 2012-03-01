@@ -117,6 +117,7 @@ class Gadget:
         self._payload = ""
         self._ais = dict()
         self._offsets = list()
+        self._pretty_string = ""
         
     def get_offset(self):
         """
@@ -185,6 +186,7 @@ class Gadget:
         self._ais[offset] = ai
         self._payload += ai.get_payload()
         self._offset += ai.get_size()
+        self._pretty_string += '\t\t%s\n'%str(ai)
         return offset
         
     def db(self, string_token):
@@ -382,24 +384,31 @@ class Gadget:
         """
         if gadget.get_start_offset() != self._offset:
             return
+        if gadget.get_mnemonic():
+            self._pretty_string += '\t\t->| BEGIN "%s"\n'%(gadget.get_mnemonic())
         for offset in gadget.get_offsets():
             self.commit_ai(gadget.get_ai(offset))
+        if gadget.get_mnemonic():
+            self._pretty_string += '\t\t|<- END   "%s"\n'%(gadget.get_mnemonic())
         return gadget.get_start_offset(), gadget.get_size()
+        
+    def get_mnemonic(self):
+        return self._mnemonic
       
     def __str__(self):
         """
-        @returns:  instance as a mnemonic string
+        @returns:  instance as a pretty string
         """
-        return "\n".join(['\t\t' + str(self._ais[offset]) for offset in self._offsets])
+        return self._pretty_string.rstrip('\n')
         
     def display(self):
         """
         displays instance ias a mnemonic-string
         """
-        mnemonic_string = str(self)
+        #mnemonic_string = str(self)
         if self._mnemonic:
             mnemonic_string = '->| BEGIN "%s"\n%s\n|<- END "%s"'%(self._mnemonic,mnemonic_string,self._mnemonic)
-        print '\t\tGADGET (entry-point at 0x%08X):\n%s'%(self._ep,mnemonic_string)
+        print '\t\tGADGET (entry-point at 0x%08X):\n%s'%(self._ep, str(self))
         opcodes = ""
         for j in xrange(self.get_size()):
             byte = self._payload[j]
@@ -417,7 +426,7 @@ class SleepExGadget(Gadget):
                  dwMilliseconds,
                  bAlertable=1,
                  start_offset=0,
-                 mnemonic="invoke kernel32.dll!SleepEx",
+                 mnemonic="kernel32.dll!SleepEx",
                  ):
         Gadget.__init__(self, start_offset=start_offset, mnemonic=mnemonic)
         self.push(bAlertable)
@@ -432,7 +441,7 @@ class ExitThreadGadget(Gadget):
     def __init__(self,
                 dwExitCode=0,
                 start_offset=0,
-                mnemonic="invoke kernel32.dll!ExitThread"
+                mnemonic="kernel32.dll!ExitThread"
                 ):
         Gadget.__init__(self, start_offset=start_offset, mnemonic=mnemonic)
         self.push(dwExitCode)
@@ -446,7 +455,7 @@ class FreeLibraryAndExitThreadGadget(Gadget):
     def __init__(self,
                  dll_handle, # dll handle in target process
                  start_offset=0,
-                 mnemonic='invoke kernel32.dll!FreeLibraryAndExitThread',
+                 mnemonic='kernel32.dll!FreeLibraryAndExitThread',
                  ):
         Gadget.__init__(self, start_offset=start_offset, mnemonic=mnemonic)
         self.push(0x0)
@@ -466,7 +475,7 @@ class FreeLibraryGadget(Gadget):
     def __init__(self,
                  dll_handle,
                  start_offset=0,
-                 mnemonic='invoke kernel32.dll!FreeLibrary',
+                 mnemonic='kernel32.dll!FreeLibrary',
                  ):
         Gadget.__init__(self, start_offset=start_offset, mnemonic=mnemonic,)
         self.push_content(dll_handle)
@@ -480,7 +489,7 @@ class LoadLibraryGadget(Gadget):
     def __init__(self,
                  dll_addr, # address of dll in target process memory
                  start_offset=0,
-                 mnemonic='invoke kernel32.dll!LoadLibraryA',
+                 mnemonic='kernel32.dll!LoadLibraryA',
                  ):
         Gadget.__init__(self, start_offset=start_offset, mnemonic=mnemonic,)
         self.push(dll_addr)
@@ -494,7 +503,7 @@ class GetModuleHandleGadget(Gadget):
     def __init__(self,
                  dll_addr, # address of dll in target process memory
                  start_offset=0,
-                 mnemonic='invoke kernel32.dll!GetModuleHandleA',
+                 mnemonic='kernel32.dll!GetModuleHandleA',
                  ):
         Gadget.__init__(self, start_offset=start_offset, mnemonic=mnemonic,)
         self.push(dll_addr)
@@ -515,7 +524,7 @@ class GetProcAddressGadget(Gadget):
                  dll_handle, 
                  api_addr, # address of api in target process memory
                  start_offset=0,
-                 mnemonic='invoke GetProcAddress',
+                 mnemonic='GetProcAddress',
                  ):
         Gadget.__init__(self, start_offset=start_offset, mnemonic=mnemonic,)
         self.push(api_addr)
@@ -540,7 +549,7 @@ class MessageBoxGadget(Gadget):
                  caption_addr,
                  category=MB_OK | MB_ICONINFORMATION,
                  start_offset=0,
-                 mnemonic='invoke user32.dll!MessageBoxA',
+                 mnemonic='user32.dll!MessageBoxA',
                  ):
         Gadget.__init__(self,
                            start_offset=start_offset,
@@ -767,15 +776,15 @@ class weShouldHaveAGetProcAddressGadget(unittest.TestCase):
     def testOkWeDo(self):
         gadget = GetProcAddressGadget(0xDEADBEEF, 0x44434241)
         gadget.display() 
-        
-        
+         
+    
 # main
 if __name__ == '__main__':
-    print "[+] %s %s %s %s"%("+"*13,os.path.basename(sys.argv[0]),__AUTHOR__,"+"*13)
+    print "%s %s %s %s"%("+"*13,os.path.basename(sys.argv[0]),__AUTHOR__,"+"*13)
     
     # sanitize command-line
     if len(sys.argv) < 3:
-        print "[+] [+]Usage: python %s [OPTIONS] <target_PID> </path/to/dll/to/inject>"%sys.argv[0]
+        print "[+] Usage: python %s [OPTIONS] <target_PID> </path/to/dll/to/inject>"%sys.argv[0]
         sys.exit(1)
     pid = int(sys.argv[1])
     dll_path = os.path.abspath(sys.argv[2])
@@ -786,7 +795,7 @@ if __name__ == '__main__':
         action = sys.argv[3]
     
     # grab a handle to the target process
-    print "[+] [+] Obtaining handle to target process .."
+    print "[+] Obtaining handle to target process .."
     h = windll.kernel32.OpenProcess(PROCESS_ALL_ACCESS, 0, pid)
     assert h, "can't obtain handle target process"
     print "[+] OK."
@@ -844,17 +853,27 @@ if __name__ == '__main__':
     quit
     [snip]
     """
-    dll_handle_grabber = GetModuleHandleGadget(dll_addr, start_offset=gadget.get_ep())
+    dll_handle_grabber = GetModuleHandleGadget(dll_addr,
+                                               start_offset=gadget.get_ep(),
+                                               mnemonic='grab %s handle'%dll_name,
+                                               )
     gadget.commit_gadget(dll_handle_grabber)
     gadget.cmp_eax(0x0)
     if action == "load":
         gadget.jnz(gadget.get_offset() + CONDITIONALJMPPAYLOAD_LEN + LOADLIBRARYPAYLOAD_LEN)
-        dll_loader = LoadLibraryGadget(dll_addr, start_offset=gadget.get_offset())
+        dll_loader = LoadLibraryGadget(dll_addr,
+                                       start_offset=gadget.get_offset(),
+                                       mnemonic="%s loader"%dll_name,
+                                       )
         gadget.commit_gadget(dll_loader)
         gadget.cmp_eax(0x0)
         msgb_ep = gadget.get_offset() + CONDITIONALJMPPAYLOAD_LEN
-        msgb = MessageBoxGadget(injection_failure_notification_txt_addr, err_caption_addr, category=MB_ICONERROR,
-                               start_offset=msgb_ep,)
+        msgb = MessageBoxGadget(injection_failure_notification_txt_addr,
+                                err_caption_addr,
+                                category=MB_ICONERROR,
+                                start_offset=msgb_ep,
+                                mnemonic='injection failure popup',
+                                )
         thread_killer_ep = msgb_ep + msgb.get_size()
         thread_killer = ExitThreadGadget(start_offset=thread_killer_ep,)
         offset_just_after_error_stuff = gadget.get_offset() # we are here
@@ -867,8 +886,12 @@ if __name__ == '__main__':
         gadget.mov_eax_to_addr(dll_addr)
     else:
         msgb_ep = gadget.get_offset() + CONDITIONALJMPPAYLOAD_LEN
-        msgb = MessageBoxGadget(ejection_failure_notification_txt_addr, err_caption_addr, category=MB_ICONERROR,
-                               start_offset=msgb_ep,)
+        msgb = MessageBoxGadget(ejection_failure_notification_txt_addr,
+                                err_caption_addr,
+                                category=MB_ICONERROR,
+                                start_offset=msgb_ep,
+                                mnemonic='ejection failure popup',
+                                )
         thread_killer_ep = msgb_ep + msgb.get_size()
         thread_killer = ExitThreadGadget(start_offset=thread_killer_ep,)
         offset_just_after_error_stuff = gadget.get_offset() # we are here
@@ -879,7 +902,9 @@ if __name__ == '__main__':
         gadget.commit_gadget(msgb)
         gadget.commit_gadget(thread_killer)
         gadget.mov_eax_to_addr(dll_addr)
-        dll_unloader = FreeLibraryAndExitThreadGadget(dll_addr, start_offset=gadget.get_offset())
+        dll_unloader = FreeLibraryAndExitThreadGadget(dll_addr, start_offset=gadget.get_offset(),
+                                                      mnemonic="%s unloader"%dll_name,
+                                                      )
         gadget.commit_gadget(dll_unloader)
     thread_killer = ExitThreadGadget(start_offset=gadget.get_offset())
     gadget.commit_gadget(thread_killer)
