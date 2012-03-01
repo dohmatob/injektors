@@ -11,7 +11,7 @@ import sys
 import os
 from libdebug.constants import *
 
-__AUTHOR__ = "by h4lf-j1ff13 (dohmatob elvis dopgima)"
+__AUTHOR__ = "h4lf-j1ff13 (dohmatob elvis dopgima)"
 
 # exported constants
 CMPEAXPAYLOAD_LEN = 5
@@ -771,7 +771,7 @@ class weShouldHaveAGetProcAddressGadget(unittest.TestCase):
         
 # main
 if __name__ == '__main__':
-    print "[+] %s %s %s %s"%("+"*13,os.path.basename(sys.argv[0]),__AUTHOR__,"+"*13)
+    print "%s %s by %s %s"%("+"*13,os.path.basename(sys.argv[0]),__AUTHOR__,"+"*13)
     
     # sanitize command-line
     if len(sys.argv) < 3:
