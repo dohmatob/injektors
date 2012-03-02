@@ -19,17 +19,13 @@ Re-write this README from from scratch!
 
 1. Sample usage
 +++++++++++++++
-<<<<<<< HEAD
 Below, we inject pinballspy.dll into pinball process (PID = 7748), and once the DLL is loaded, we
 import and invoke pinballspy.dll!TrapScore API. Viz,
-=======
-Below, we eject ghp_inject.dll from process with PID 7748.
->>>>>>> a8a978e6cc2d5b0adbbf4ce1f1097dbb6ec360b5
 
 PS C:\users\rude-boi> python code\injektors\spike\gadgets.py 8156 '.\Documents\Visual Studio 2010\
 Projects\pinballspy\Debug\pinballspy.dll' --invoke-api TrapScore
 +++++++++++++ gadgets.py by h4lf-j1ff13 (dohmatob elvis dopgima) +++++++++++++
-[+] [+] Obtaining handle to target process ..
+[+] Obtaining handle to target process ..
 [+] OK.
 [+] Allocating 500-byte codecave in target process ..
 [+] OK.

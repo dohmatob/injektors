@@ -849,7 +849,7 @@ if __name__ == '__main__':
     print __VERSION__
     
     # grab a handle to the target process
-    print "[+] [+] Obtaining handle to target process .."
+    print "[+] Obtaining handle to target process .."
     h = windll.kernel32.OpenProcess(PROCESS_ALL_ACCESS, 0, pid)
     assert h, "can't obtain handle target process"
     print "[+] OK."
