@@ -1,10 +1,10 @@
-; kirikou.asm by h4lf-jiffie (dohmatib elvis dopgima): scanner + loader
+; kirikou.asm by h4lf-jiffie (dohmatob elvis dopgima): scanner + loader
 
 ; What is this ?
 ;		- Current thread loads a specified dll (by default pinballspy.dll) into process, and then suicides!
-;	        - All APIs need are ripped from process image memory; nothing is hard-coded.
+;	        - All APIs needed are ripped from process image; nothing is hard-coded.
 
-; TODO XXX use API name hashes instead of strings (les opcodes seront plus discrèt et moins lourd!)
+; TODO XXX use API name hashes instead of strings (les opcodes seront plus discrï¿½t et moins lourd!)
 
 
 ; 4CKNOWLEDGEMENT5: 
@@ -29,7 +29,7 @@ global _start
 
 _start:
     xor eax,eax
-    xor ebx,ebx ;registres à zero
+    xor ebx,ebx ;registres ï¿½ zero
     xor ecx,ecx
     xor esi,esi
     xor edi,edi
@@ -50,7 +50,7 @@ get_export_directory_table:
     add ebx,edx ; ebx = adresse Export Directory Table
     
 get_GetProcAddress_address:
-    mov ecx, [ebx+0x18] ; ecx = nbre de fonctions exportées (compteur)
+    mov ecx, [ebx+0x18] ; ecx = nbre de fonctions exportï¿½es (compteur)
     mov eax, [ebx+0x20] ; eax = Offset Export Name Pointer Table dans Kernel32
     add eax,edx ; eax = Adresse Export Name Pointer Table
     
@@ -64,16 +64,16 @@ get_GetProcAddress_string_return:
     add esi,edx ; esi = adresse 'NomFonction\n' dans Name Pointer Table
     push ecx ; sauvegarde ecx
     xor ecx,ecx
-    add cl,14 ; ecx = nbre caractères dans GetProcAddress
+    add cl,14 ; ecx = nbre caractï¿½res dans GetProcAddress
     repe cmpsb ; compare chaines edi et esi
     pop ecx ; ecx = compteur nombre exports
     jnz get_GetProcAddress_address_loop
     mov eax, [ebx+0x24] ; eax = offset Ordinal Table dans Kernel32
     add eax,edx ; eax = adresse Ordinal Table
-    mov cx, [eax+ecx*2] ; cx = ordinal de la fonction - numéro du 1er ordinal
-    mov ax,[ebx+0x10] ; eax = numéro du premier ordinal de la table
+    mov cx, [eax+ecx*2] ; cx = ordinal de la fonction - numï¿½ro du 1er ordinal
+    mov ax,[ebx+0x10] ; eax = numï¿½ro du premier ordinal de la table
     add cx,ax ; cx = ordinal de la fonction
-    dec cx ; pour tomber juste (ordinal débute à 0)
+    dec cx ; pour tomber juste (ordinal dï¿½bute ï¿½ 0)
     mov eax,[ebx+0x1c] ; eax = offset Export Address Table
     add eax,edx ; eax = adresse Export Address Table
     mov eax,[eax+ecx*4] ; eax = offset de GetProcAddress dans Kernel32
