@@ -2,7 +2,7 @@
 
 ; What is this ?
 ;		- Current thread loads a specified dll (by default pinballspy.dll) into process, and then suicides!
-;	        - All APIs needed are ripped from process image memory; nothing is hard-coded.
+;	        - All APIs needed are ripped from process image; nothing is hard-coded.
 
 ; TODO XXX use API name hashes instead of strings (les opcodes seront plus discr�t et moins lourd!)
 
