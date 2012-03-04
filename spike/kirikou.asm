@@ -1,4 +1,4 @@
-; kirikou.asm by h4lf-jiffie (dohmatib elvis dopgima): scanner + loader
+; kirikou.asm by h4lf-jiffie (dohmatob elvis dopgima): scanner + loader
 
 ; What is this ?
 ;		- Current thread loads a specified dll (by default pinballspy.dll) into process, and then suicides!
