@@ -392,6 +392,24 @@ class Gadget:
         ai.set_payload("\x9C")
         return self.commit_ai(ai)
         
+    def push_eax(self):
+        """
+        @description: commits an 'PUSH EAX' instruction
+        """
+        ai = AsmInstruction()
+        ai.set_mnemonic("PUSH EAX")
+        ai.set_payload("\x50")
+        return self.commit_ai(ai)
+      
+    def pop_eax(self):
+        """
+        @description: commits an 'POP EAX' instruction
+        """
+        ai = AsmInstruction()
+        ai.set_mnemonic("POP EAX")
+        ai.set_payload("\x58")
+        return self.commit_ai(ai)
+        
     def popfd(self):
         """
         @description: commits an 'POPFD' instruction
@@ -452,6 +470,45 @@ class Gadget:
                 assert False, "Oops! gadget has overflowed by %d bytes; max size was set to %d."%(
                     self.get_size() - self.get_max_size(), self.get_max_size())
         return gadget.get_start_offset(), gadget.get_size()
+        
+    def get_eip(self):
+       """
+       @description: uses fnstenv-technique (http://www.phrack.org/issues.html?id=7&issue=62)
+                     to obtain self._offset (eip); ecx then contains the stuff
+       """
+       ai = AsmInstruction()
+       ai.set_mnemonic("FLDZ")
+       ai.set_payload("\xD9\xEE")
+       self.commit_ai(ai)
+       
+       ai.set_mnemonic("fnstenv [esp-C]")
+       ai.set_payload("\xD9\x74\x24\xF4")
+       self.commit_ai(ai)
+       
+       ai.set_mnemonic("POP ECX")
+       ai.set_payload("\x59")
+       self.commit_ai(ai)
+       
+       ai.set_mnemonic("ADD CL, 0A")
+       ai.set_payload("\x80\xC1\x0A")
+       self.commit_ai(ai)
+       
+       self.nop()
+       
+       self.set_ep()
+       
+    def push_offset(self, offset):
+        ai = AsmInstruction()
+        ai.set_mnemonic("MOV EAX, ECX")
+        ai.set_payload("\x8B\xC1")
+        self.commit_ai(ai)
+        
+        delta = self.get_ep() - offset
+        ai.set_payload("\x83\xEB" + self.packed_dword(delta))
+        ai.set_mnemonic("SUB EAX, 0%X"%delta)
+        self.commit_ai(ai)
+        
+        self.push_eax()
         
     def jne_skip_stub(self, stub):
         """
@@ -575,13 +632,17 @@ class LoadLibraryGadget(Gadget):
     gadget for invoking kernel32.dll!LoadLibraryA API
     """
     def __init__(self,
-                 dll_addr, # address of dll in target process memory
+                 dll_addr, # address of dll path in target process memory
                  start_offset=0,
                  mnemonic='invoke kernel32.dll!LoadLibraryA',
                  ):
         Gadget.__init__(self, start_offset=start_offset, mnemonic=mnemonic,)
-        self.push(dll_addr)
+        self.push_offset(dll_addr)
+        self.pushad()
+        self.pushfd()
         self.call(WINAPI['LoadLibraryA'])
+        self.popfd()
+        self.popad()
         
         
 class GetModuleHandleGadget(Gadget):
@@ -589,13 +650,17 @@ class GetModuleHandleGadget(Gadget):
     gadget for invoking kernel32.dll!GetModuleHandleA API
     """
     def __init__(self,
-                 dll_addr, # address of dll in target process memory
+                 dll_addr, # address of dll in target process memory or its offset relative to ecx value
                  start_offset=0,
                  mnemonic='invoke kernel32.dll!GetModuleHandleA',
                  ):
         Gadget.__init__(self, start_offset=start_offset, mnemonic=mnemonic,)
         self.push(dll_addr)
+        self.pushad()
+        self.pushfd()
         self.call(WINAPI['GetModuleHandleA'])
+        self.popfd()
+        self.popad()
 
     
 class GetProcAddressGadget(Gadget):
@@ -1002,6 +1067,9 @@ if __name__ == '__main__':
     quit
     [snip]
     """
+    #gadget.int3()
+    #gadget.get_eip()
+    #gadget.int3()
     error_handler = ErrorPopupGadget(err_caption_addr,
                                      start_offset=gadget.get_offset(),
                                      mnemonic="error_handler",)
@@ -1010,14 +1078,17 @@ if __name__ == '__main__':
     gadget.commit_gadget(error_handler) 
     gadget.commit_gadget(thread_killer)
     gadget.set_ep() # set gadget entry-point
+    gadget.int3()
     dll_handle_grabber = GetModuleHandleGadget(dll_addr, start_offset=gadget.get_offset(),
                                                mnemonic='grab %s handle'%dll_name)
     gadget.commit_gadget(dll_handle_grabber)
+    gadget.int3()
     gadget.cmp_eax(0x0)
     if action != 0x0:
         dll_loader = LoadLibraryGadget(dll_addr, start_offset=gadget.get_offset() + CONDITIONALJMPPAYLOAD_LEN,
                                        mnemonic='load %s'%dll_name)
         gadget.jne_skip_stub(dll_loader)
+        gadget.int3()
         gadget.cmp_eax(0x0)
         gadget.mov_to_ebx(injection_failure_notification_txt_addr) 
         gadget.je(error_handler.get_ep())
@@ -1045,11 +1116,15 @@ if __name__ == '__main__':
     #                      mnemonic="invoke ipconfig",
     #                      )
     #gadget.commit_gadget(devil)
+    #eip_grabber = "\xD9\xEE\xD9\x74\x24\xF4\x59\x80\xC1\x0A\x90"
+    #gadget._payload += eip_grabber
+    #gadget._offset += len(eip_grabber)
+    #gadget.int3()
     gadget.jmp(thread_killer.get_ep())
     gadget.display()
         
     # copy gadget to codecave dug earlier in target process
-    print "[+] Coping gadget to codecave in remote process .."
+    print "[+] Copying gadget to codecave in remote process .."
     assert windll.kernel32.WriteProcessMemory(h, codecave, gadget.get_payload(), gadget.get_size(), 0)
     print "[+] OK."
     
