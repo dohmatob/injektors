@@ -97,19 +97,23 @@ load_apis:
 				; 3]-- ebx set to the address of GetProcAddress
     
 load_next_api:
-    mov   	al,[esi]
-    inc		esi
+    lodsb
     test	al,al
     jnz         load_next_api
-    mov		al,[esi]
+
+check_end_of_API_table:
+    lodsb
+    dec		esi 		; fix-up
     test	al,al
-    jz 		load_apis_end	; end of table
+    jz 		load_apis_end	
+
+continue_load_nex_api:
     push	ebx  		; save
     push 	edx		; save
     push	esi  
     push	edx  		; DLL address
     call	ebx  		; GetProcAddress(DLL address, API_Name);
-    ; int3			; uncomment this INT3 and inspect eax in a debugger
+    ; int3			; uncomment this INT3 and inspect eax in a debugger (ollydbg?) if u will
     pop edx			; restore 
     pop	ebx			; restore   
     stosd			; write the output to EDI
