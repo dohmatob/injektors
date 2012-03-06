@@ -131,6 +131,8 @@ grab_nspr4dll_handle:
     jmp     after_grab_nspr4dll_handle
     
 after_grab_nspr4dll_handle:
+    test        eax,eax
+    jz          error           ; NSPR4.DLL not yet loaded or process is not FIREFOX !
     mov         edx,eax
     ;int3
     jmp         get_stuff_to_hook_from_nspr4dll
