@@ -1,5 +1,7 @@
 ; +++++[ firefighter.asm by h4lf-jiffie (dohmatob elvis dopgima): FireFox post-encryption traffic sniffer ]+++++
 
+; /!\ This is for educationally purposed, ripped straight out of my daily ramblings. But that's besides the point ..
+
 ; HOWTO:
 ;    0]-- Compile with 'nasm -f bin -o firefighter.bin firefighter.asm'
 ;    1]-- Use some opcode wizard to extract the generated shellcode. I use PYHTON.
@@ -39,7 +41,7 @@ _start:
 ;                                            ; && @here = eax.  
 ;                                            ; But olldbg tells me: @here - @crypto = 10 bytes.
 ;                                            ; Thus, @entry_point = eax + (@entry_point - @crypto) - 0xA = 
-;                                            ; eax + (@entry_point - J) - (@here - J) - 0xA, for all J.
+;                                            ; eax + (@entry_point - J) - (@crypto - J) - 0xA, for all J.
 ;                                            ; Q.E.D.
 ;                                             
 ;    mov esi,eax                 ; esi = @entry_point
