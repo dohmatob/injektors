@@ -3,8 +3,6 @@
 
 ; /!\ This is for educationally purposed, ripped straight out of my daily ramblings. But that's besides the point ..
 
-; /!\ This is for educationally purposed, ripped straight out of my daily ramblings. But that's besides the point ..
-
 ; HOWTO:
 ;    0]-- Compile with 'nasm -f bin -o firefighter.bin firefighter.asm'
 ;    1]-- Use some opcode wizard to extract the generated shellcode. I use PYHTON.
