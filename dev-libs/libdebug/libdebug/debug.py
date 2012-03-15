@@ -47,8 +47,9 @@ def EnumProcesses():
     kernel32.CloseHandle(hProcSnap) # sanity
     
 def GetProcessIdFromName(szProcName):
+    imagename = os.path.basename(szProcName).lower()
     for pe32 in EnumProcesses():
-        if os.path.basename(szProcName).lower() == pe32.szExeFile.rstrip(".exe").lower(): # filter
+        if re.match("%s(?:\.[eE][xX][eE])?"%imagename, pe32.szExeFile):
             return pe32.th32ProcessID
         
 def EnumThreads(dwOwnerId):
