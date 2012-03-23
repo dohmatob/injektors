@@ -1,5 +1,6 @@
 """
-This module implements handy win32 FFIs (Foreign-Function Interfaces) for stuff like thread enumeration, etc.
+This module implements handy win32 FFIs (Foreign-Function Interfaces) for stuff like thread enumeration,
+memory walking, etc.
 
 (c) half-jiffie (dohmatob elvis dopgima)
 """
@@ -47,9 +48,8 @@ def EnumProcesses():
     kernel32.CloseHandle(hProcSnap) # sanity
     
 def GetProcessIdFromName(szProcName):
-    imagename = os.path.basename(szProcName).lower()
     for pe32 in EnumProcesses():
-        if re.match("%s(?:\.[eE][xX][eE])?"%imagename, pe32.szExeFile):
+        if os.path.basename(szProcName).lower() == pe32.szExeFile.rstrip(".exe").lower(): # filter
             return pe32.th32ProcessID
         
 def EnumThreads(dwOwnerId):
@@ -73,47 +73,50 @@ def EnumThreads(dwOwnerId):
 
 def FindSignatureInProcessMemory(hProcess, 
                                  pSignature, # sought-for signature, a character-string/buffer
-                                 BadMbiFilter=None, # a explicitly-specified filter for barren (not worth scraping) MBIs
+                                 isBadMbi=None, # filter for MBIs to avoid
+                                 isBadAddress=None, # fiter for hit addresses to avoid
+                                 lower=None,        # don't search before this point
+                                 upper=None,        # don't search behond this point
                                  ):
     """
     Passively scrapes a given process's memory, looking for specified signature (string of bytes)
     """
+    
+    # grab process handle
     if not hProcess:
         return # XXX This is not enough; raise exception or something similar
+    
+    # initialize variables
     mbi = MEMORY_BASIC_INFORMATION()
-    si = SYSTEM_INFO(SYSTEM_INFO_UNION(0))
-    dwOldProtection = DWORD(0)
+    si = SYSTEM_INFO(SYSTEM_INFO_UNION(0))  # we'll need to know the system page size, etc.
+    dwOldProtection = DWORD()  # we'll be tweaking page protections
     windll.kernel32.GetSystemInfo(byref(si))
     dwSignature = len(pSignature)
+    pattern = re.compile(pSignature) # RE engine for sought-for pSignature
     pBytesRead = create_string_buffer(si.dwPageSize) # create a character-buffer as large as a system page
-    dwBytesRead = DWORD(0)
-    pattern = re.compile(re.escape(pSignature))
-    def SkipMbi(mbi):
-        """
-        Filters memory regions to be skipped
-        """
-        criterion = (mbi.State != MEM_COMMIT) # bring-in state criterion
-        # criterion = criterion or ((mbi.Type != MEM_MAPPED) and (mbi.Type != MEM_IMAGE)) # bring-in type criterion
-        if not BadMbiFilter is None:
-            criterion = criterion or BadMbiFilter(mbi)
-        return criterion
-    """
-    scrape process's address space
-    """
-    dwRegionOffset = si.lpMinimumApplicationAddress 
-    while dwRegionOffset < si.lpMaximumApplicationAddress:
+    dwBytesRead = DWORD()
+    lower_bound = si.lpMinimumApplicationAddress
+    upper_bound = si.lpMaximumApplicationAddress
+    if not lower is None:
+        lower_bound = max(lower_bound, lower)
+    if not upper is None:
+        upper_bound = min(upper_bound, upper)
+    
+    # scrape
+    dwRegionOffset = lower_bound # start searching here
+    while dwRegionOffset < upper_bound:
         windll.kernel32.VirtualQueryEx(hProcess,
                                        dwRegionOffset,
                                        byref(mbi),
                                        sizeof(MEMORY_BASIC_INFORMATION),
                                        )
-        if SkipMbi(mbi):
-            dwRegionOffset = dwRegionOffset + mbi.RegionSize 
+        if not isBadMbi is None:
+            if isBadMbi(mbi):
+                dwRegionOffset = dwRegionOffset + mbi.RegionSize
             continue # barren; move-on to next region
-        """
-        scrape current memory region in si.dwPageSize-byte blocks. XXX my assumption is that regions are always 
-        multiples of the system page size --No?
-        """
+        
+        # scrape current memory region in si.dwPageSize-byte blocks.
+        # XXX BTW, my assumption is that regions are always multiples of the system page size --No?
         for dwBlockOffset in xrange(dwRegionOffset, dwRegionOffset + mbi.RegionSize, si.dwPageSize):
             if not windll.kernel32.VirtualProtectEx(hProcess,
                                                     dwBlockOffset,
@@ -137,13 +140,20 @@ def FindSignatureInProcessMemory(hProcess,
             read_OK = read_OK and (dwBytesRead.value == si.dwPageSize)
             if not read_OK:
                 continue # barren; move-on to next block
-            """
-            scrape character-buffer for all occurences of sought-for signature
-            """
+            
+            # finally (sighs!), we've managed to scrape something: search for'll occurences of sought-for signature
             for item in pattern.finditer(pBytesRead):
-                yield item.start() + dwBlockOffset
+                hit = item.start() + dwBlockOffset
+                if not isBadAddress is None:
+                    if isBadAddress(hit):
+                        continue
+                yield hit
+                
+        # continue
         dwRegionOffset = dwRegionOffset + mbi.RegionSize # move-on to next block
-    windll.kernel32.CloseHandle(hProcess) # sanity
+        
+    # sanity
+    windll.kernel32.CloseHandle(hProcess) 
 
 def FindDwordInProcessMemory(hProcess, 
                              dwValue,
@@ -167,6 +177,7 @@ def FindDwordInProcessMemory(hProcess,
 
 def FindSignatureInBinaryFile(filename,
                               byte_seq,
+                              isBadAddress=None,
                               ):
     """
     Passively scrapes a specified program (PE binary file), looking for a specified signature (string of bytes)
@@ -180,8 +191,12 @@ this feature won't work"
     pe_obj = pefile.PE(filename) 
     for item in re.finditer(byte_seq,
                             pe_obj.get_memory_mapped_image(), 
-                            ): 
-        yield item.start() + pe_obj.OPTIONAL_HEADER.ImageBase
+                            ):
+        hit = item.start() + pe_obj.OPTIONAL_HEADER.ImageBase
+        if not isBadAddress is None:
+            if isBadAddress(hit):
+                continue
+        yield 
                     
 if __name__ == '__main__':
     from optparse import OptionParser
