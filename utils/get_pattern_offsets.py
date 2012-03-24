@@ -13,8 +13,8 @@ if __name__ == '__main__':
     hits = get_pattern_offsets(sys.argv[1], int(sys.argv[2]))
 
     if not hits:
-        print "Insoluble."
+        print "[+] Insoluble."
         sys.exit(1)
         
-    print "Pattern found at followind offsets:"
+    print "[+] Pattern found at following offsets:"
     print "\t" + ', '.join([str(j) for j in hits])
