@@ -1,4 +1,4 @@
-# quine.asm by h4lf-jiffie (dohmatob elvis dopgima) a tiny ALPHA encoder
+# quine.py by h4lf-jiffie (dohmatob elvis dopgima) a tiny ALPHA encoder
 # 4CKNOWLEDGEMENTS:
 #    0]-- the shellcoder's handbook
 
