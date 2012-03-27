@@ -1,6 +1,8 @@
 """
 Tested OK against Windows XP [Version 5.1.2600] box
 
+BTW, get vulnserver from http://grey-corner.blogspot.fr/p/vulnserver.html
+
 (c) h4lf-jiffie (dohmatob elvis dopgima)
 """
 
