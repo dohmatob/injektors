@@ -70,31 +70,61 @@ def EnumThreads(dwOwnerId):
             if not kernel32.Thread32Next(hThreadSnap, byref(te32)):
                 break
     kernel32.CloseHandle(hThreadSnap) # sanity
-
-def FindSignatureInProcessMemory(hProcess, 
-                                 pSignature, # sought-for signature, a character-string/buffer
-                                 isBadMbi=None, # filter for MBIs to avoid
-                                 isBadAddress=None, # fiter for hit addresses to avoid
-                                 lower=None,        # don't search before this point
-                                 upper=None,        # don't search behond this point
-                                 ):
+    
+def DumpProcessMemory(hProc, address, size):
     """
-    Passively scrapes a given process's memory, looking for specified signature (string of bytes)
+    @description: Attemps to dump 'size' bytes of process memory start from 'address'.
+    4CKNOWLEDGEMENTS:
+        Inspired by PEDRAM's PYDBG read_proces_memory(..) method (see his pydbg.py)
     """
     
-    # grab process handle
-    if not hProcess:
-        return # XXX This is not enough; raise exception or something similar
+    # initialize variables
+    data = ""
+    read_buf = create_string_buffer(size)
+    read_count = DWORD(0)
+    old_protect = DWORD(0)
+    cursor = address  # pointer to current data chunk to dump
+    length = size
+
+    # tweak mem protections
+    if not windll.kernel32.VirtualProtectEx(hProc, address, length, PAGE_EXECUTE_READWRITE, byref(old_protect)):
+        return data
+
+    # dump
+    while length > 0:
+        if not windll.kernel32.ReadProcessMemory(hProc, address, read_buf, length, byref(read_count)):
+            return data
+
+        data += read_buf.raw
+        length -= read_count.value
+        cursor += read_count.value
+
+    # restore mem protections
+    windll.kernel32.VirtualProtectEx(hProc, address, size, old_protect, byref(old_protect))
+
+    # render results
+    return data
+
+def FindSignatureInProcessMemory(hProcess, 
+                                 pSignature,    # sought-for signature, a character-string/buffer
+                                 isBadMbi=None, # filter for MBIs to avoid
+                                 isBadAddress=None, # fiter for hit addresses to avoid
+                                 lower=None,    # don't search before this point
+                                 upper=None,    # don't search behond this point
+                                 max_hits=None,      # maximum number hits to find
+                                 ):
+    """
+    @description: Scrapes a given process's memory, looking for specified signature (string token or RE pattern).
+    @returns:     An iterator on the found hits
+    """
     
     # initialize variables
     mbi = MEMORY_BASIC_INFORMATION()
     si = SYSTEM_INFO(SYSTEM_INFO_UNION(0))  # we'll need to know the system page size, etc.
-    dwOldProtection = DWORD()  # we'll be tweaking page protections
     windll.kernel32.GetSystemInfo(byref(si))
     dwSignature = len(pSignature)
     pattern = re.compile(pSignature) # RE engine for sought-for pSignature
-    pBytesRead = create_string_buffer(si.dwPageSize) # create a character-buffer as large as a system page
-    dwBytesRead = DWORD()
+    nb_hits = 0
     lower_bound = si.lpMinimumApplicationAddress
     upper_bound = si.lpMaximumApplicationAddress
     if not lower is None:
@@ -103,57 +133,45 @@ def FindSignatureInProcessMemory(hProcess,
         upper_bound = min(upper_bound, upper)
     
     # scrape
-    dwRegionOffset = lower_bound # start searching here
-    while dwRegionOffset < upper_bound:
+    cursor = lower_bound # pointer current region
+    while cursor < upper_bound:
         windll.kernel32.VirtualQueryEx(hProcess,
-                                       dwRegionOffset,
+                                       cursor,
                                        byref(mbi),
                                        sizeof(MEMORY_BASIC_INFORMATION),
                                        )
+        skip = False
+        skip |= (mbi.State != MEM_COMMIT)
         if not isBadMbi is None:
-            if isBadMbi(mbi):
-                dwRegionOffset = dwRegionOffset + mbi.RegionSize
-            continue # barren; move-on to next region
+            skip |= isBadMbi(mbi)
+        if skip:
+                cursor = cursor + mbi.RegionSize
+                continue # barren; move-on to next region
         
-        # scrape current memory region in si.dwPageSize-byte blocks.
-        # XXX BTW, my assumption is that regions are always multiples of the system page size --No?
-        for dwBlockOffset in xrange(dwRegionOffset, dwRegionOffset + mbi.RegionSize, si.dwPageSize):
-            if not windll.kernel32.VirtualProtectEx(hProcess,
-                                                    dwBlockOffset,
-                                                    si.dwPageSize,
-                                                    PAGE_READWRITE,
-                                                    byref(dwOldProtection),
-                                                    ):
-                continue # barren; move-on to next block
-            read_OK = windll.kernel32.ReadProcessMemory(hProcess,
-                                                        dwBlockOffset,
-                                                        pBytesRead,
-                                                        si.dwPageSize,
-                                                        byref(dwBytesRead),
-                                                        )
-            windll.kernel32.VirtualProtectEx(hProcess,
-                                             dwBlockOffset,
-                                             si.dwPageSize,
-                                             dwOldProtection,
-                                             byref(dwOldProtection),
-                                             ) # restore protections
-            read_OK = read_OK and (dwBytesRead.value == si.dwPageSize)
-            if not read_OK:
-                continue # barren; move-on to next block
-            
-            # finally (sighs!), we've managed to scrape something: search for'll occurences of sought-for signature
-            for item in pattern.finditer(pBytesRead):
-                hit = item.start() + dwBlockOffset
-                if not isBadAddress is None:
-                    if isBadAddress(hit):
-                        continue
-                yield hit
+        # dump region, at most si.dwPageSize bytes at a time!
+        offset = mbi.BaseAddress
+        buf = ""
+        while offset <= mbi.BaseAddress + mbi.RegionSize:
+            buf += DumpProcessMemory(hProcess, offset,si.dwPageSize)
+            offset += si.dwPageSize
+        # don't spare any byte
+        buf += DumpProcessMemory(hProcess, offset, max(mbi.RegionSize + mbi.BaseAddress - offset,0))
+        
+        # RE: scrape dumped data
+        for item in pattern.finditer(buf):
+            hit = item.start() + mbi.BaseAddress
+            if not isBadAddress is None:
+                if isBadAddress(hit):
+                    continue
+            # yield new finding
+            yield hit, buf[item.start():item.end()],
+            nb_hits += 1
+            if not max_hits is None:
+                if nb_hits >= max_hits:
+                    return
                 
         # continue
-        dwRegionOffset = dwRegionOffset + mbi.RegionSize # move-on to next block
-        
-    # sanity
-    windll.kernel32.CloseHandle(hProcess) 
+        cursor = cursor + mbi.RegionSize # move-on to next region
 
 def FindDwordInProcessMemory(hProcess, 
                              dwValue,
