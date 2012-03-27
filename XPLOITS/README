@@ -2,8 +2,8 @@
 + README +
 ++++++++++
 
-Here, I've  --disorderly-- grouped some of my ramblings on such diverse stuff like exploiting 
-Windows SEH, buffer overflow exploitation, etc. 
+Here, I've  --disorderly-- grouped some of my ramblings on such diverse stuff like ROP (Return-Oriented Programming), 
+Windows SEH abuse, BOFs, etc. 
 
 These things are not intended to be helpful to you.
 
