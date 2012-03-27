@@ -48,7 +48,6 @@ if __name__ == '__main__':
     if len(sys.argv) < 3:
         print 'Usage: python %s [OPTIONS] <target_IP> <target_PORT>'%(sys.argv[0])
         sys.exit(1)
-    os.chdir(os.path.dirnmare(sys.argv[0]))
     sys.path.append("../encoders")
     quine = __import__("quine")
 
