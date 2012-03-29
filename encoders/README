@@ -1,0 +1,26 @@
+++++++++++
++ README +
+++++++++++
+
+Here be grouped some of my ramblings on decoder/encoder (in the sense of
+shellcodes, emulation, and IDS character filtering). 
+
+
+0. quine.py/quine.asm
++++++++++++++++++++++
+
+quine.py is my first encoder. It is inspired by "The Shellcoder's Handbook". It attempts to encode arbitrary shellcode into
+alphabetic bytes. However, it's not very "good", as it doubles the size of the input (it works by splitting each character of the
+input buffer into 2 and then adding hex 0x41 to each half-byte, thus constructing 2 new --alphabetic-- bytes to replace 
+the original). BTW, MSF's alpha_mixed encoder does just as bad.
+
+quine.asm is the corresponding decoder. Simply tag the bytes from quine.bin ( = "\xEB\x02\xEB\x05\xE8\xF9\xFF\xFF\xFF\x5F\x83\xC7
+\x1B\x57\x5E\x8A\x07\x2C\x41\xC0\xE0\x04\x47\x02\x07\x2C\x41\x88\x06\x46\x47\x80\x3E\x51\x72\xEB") to your shellcode encoded with 
+quine.py (you don't need any 'getPC' stuff, the decoder will jump to your original shellcode once decoding is done).
+
+Unfortunately the decoder is itself non-alphabetic and I don't yet have a --reasonably small-- 'decoder-writer' for it (Any ideas ?)
+
+(c) h4lf-jiffie (dohmatob elvis dopgima)
+
+
+
