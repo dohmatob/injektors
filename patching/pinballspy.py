@@ -64,7 +64,7 @@ if __name__ == '__main__':
                                            pinball_signature,
                                            )
     try:
-        grail = results.next() + 4  # address of \x08\x1F\xA0\x0CA\x9A\x3B (i.e cmp edx, 3B91CA00)
+        grail = results.next()[0] + 4  # address of \x08\x1F\xA0\x0CA\x9A\x3B (i.e cmp edx, 3B91CA00)
         try:
             results.next()
             die("Error: oops! found characteristic signature at multiple address in pinball process memory; aborting ..")
