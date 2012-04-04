@@ -105,7 +105,7 @@ def DumpProcessMemory(hProc, address, size):
     # render results
     return data
 
-def FindSignatureInProcessMemory(hProcess, 
+def FindSignatureInProcessMemory(hProcess,
                                  pSignature,    # sought-for signature, a character-string/buffer
                                  isBadMbi=None, # filter for MBIs to avoid
                                  isBadAddress=None, # fiter for hit addresses to avoid
