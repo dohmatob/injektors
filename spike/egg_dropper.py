@@ -73,9 +73,9 @@ def drop_egg(target_PID, shellcode, hijackprimarythread=True):
         assert hThread, "CreateRemoteThread: Failed."
     windll.kernel32.WaitForSingleObject(hThread, INFINITE)
     
-    ## liberate codecave
-    #windll.kernel32.VirtualFreeEx(h, codecave, codecave_size, MEM_RELEASE)
-    #
+    # liberate codecave
+    windll.kernel32.VirtualFreeEx(h, codecave, codecave_size, MEM_RELEASE)
+    
 
 if __name__ == '__main__':
     # sanitize command-
