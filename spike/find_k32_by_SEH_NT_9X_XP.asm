@@ -14,7 +14,7 @@ BITS 32
 global _start
 
 _start:
-	
+
 find_kernel32dll:
 	
 get_SEH_record:
