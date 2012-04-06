@@ -19,7 +19,7 @@ B:
 	
 get_PC:	
 	pop		edi
-	add		edi,0x1B	; edi now points to encrypted size of the input buffer
+	add		edi,0x1B	; edi now points to encrypted input buffer
 	push		edi
 	pop		esi
 	
